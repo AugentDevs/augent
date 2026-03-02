@@ -215,6 +215,10 @@ def _strip_markdown(text: str) -> str:
         if stripped.startswith("![["):
             continue
 
+        # Skip standalone timestamp attribution lines: > — *2:15* or — 0:00
+        if re.match(r"^[>\s]*[—–\-]\s*\*?\d{1,2}:\d{2}(?::\d{2})?\*?\s*$", stripped):
+            continue
+
         # Callout lines: > [!tip] Title text
         if re.match(r">\s*\[!", stripped):
             match = re.match(r">\s*\[!\w+\]\s*(.*)", stripped)
@@ -223,14 +227,15 @@ def _strip_markdown(text: str) -> str:
             continue
 
         # Table separator lines
-        if re.match(r"\|[-\s|]+\|", stripped):
+        if re.match(r"\|[-:\s|]+\|", stripped):
             continue
 
-        # Table rows — extract cell contents
+        # Table rows — extract cell contents, skip timestamp-only cells
         if stripped.startswith("|") and stripped.endswith("|"):
             cells = [c.strip() for c in stripped.split("|")[1:-1]]
-            cells = [c for c in cells if c]
-            cleaned.append(". ".join(cells))
+            cells = [c for c in cells if c and not re.match(r"^\d{1,2}:\d{2}(?::\d{2})?$", c)]
+            if cells:
+                cleaned.append(". ".join(cells))
             continue
 
         # Strip checklist syntax
@@ -239,11 +244,17 @@ def _strip_markdown(text: str) -> str:
         # Strip blockquote
         stripped = re.sub(r"^>\s*", "", stripped)
 
+        # Strip headers with timestamp prefix: "## 5:00 — The Miami Side Quest" -> "The Miami Side Quest"
+        stripped = re.sub(r"^#{1,6}\s+\d{1,2}:\d{2}(?::\d{2})?\s*[—–\-]\s*", "", stripped)
+
         # Strip headers (keep text)
         stripped = re.sub(r"^#{1,6}\s+", "", stripped)
 
         # Strip bullet points
         stripped = re.sub(r"^\s*[-*]\s+", "", stripped)
+
+        # Strip numbered list prefixes: "**1." or "1."
+        stripped = re.sub(r"^\*?\*?\d+\.\s*\*?\*?\s*", "", stripped)
 
         # Strip bold
         stripped = re.sub(r"\*\*(.*?)\*\*", r"\1", stripped)
@@ -260,6 +271,18 @@ def _strip_markdown(text: str) -> str:
 
         # Strip inline code
         stripped = re.sub(r"`([^`]+)`", r"\1", stripped)
+
+        # Strip inline timestamps
+        stripped = re.sub(r"\b\d{1,2}:\d{2}(?::\d{2})?\b", "", stripped)
+
+        # Strip emoji and decorative unicode
+        stripped = re.sub(r"[\U0001F300-\U0001FFFF\u2600-\u27FF\u2300-\u23FF\u2B50\u2728\u2734\u2735\u2716\u2714\u2764\u00A9\u00AE\u2122\u25A0-\u25FF]+", "", stripped)
+        stripped = re.sub(r"[✦✧★☆●○◆◇▶►▷▸◂◄◁◀]+", "", stripped)
+
+        # Clean up residual artifacts: trailing/leading em dashes, double spaces
+        stripped = re.sub(r"\s*[—–]\s*$", "", stripped)
+        stripped = re.sub(r"^\s*[—–]\s*", "", stripped)
+        stripped = re.sub(r"\s{2,}", " ", stripped)
 
         if stripped.strip():
             cleaned.append(stripped.strip())
