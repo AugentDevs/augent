@@ -11,10 +11,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AugentDevs/Augent/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/AugentDevs/Augent/tests.yml?label=build&color=00F060&style=for-the-badge" alt="Build"></a>
+  <a href="https://github.com/AugentDevs/Augent/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/AugentDevs/Augent/tests.yml?label=build&style=for-the-badge" alt="Build"></a>
   <img src="https://img.shields.io/badge/dynamic/toml?url=https://raw.githubusercontent.com/AugentDevs/Augent/main/pyproject.toml&query=$.project.version&label=version&color=00F060&style=for-the-badge" alt="Version">
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-00F060.svg?style=for-the-badge" alt="Python 3.10+"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-00F060.svg?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-3776AB.svg?style=for-the-badge" alt="Python 3.10+"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT"></a>
 </p>
 
 <p align="center">
