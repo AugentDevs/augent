@@ -632,7 +632,7 @@ MODEL SIZES
 
 REQUIREMENTS
 ------------
-  Python 3.9+ | FFmpeg | yt-dlp + aria2
+  Python 3.10+ | FFmpeg | yt-dlp + aria2
 
 Docs:   https://docs.augent.app
 GitHub: https://github.com/AugentDevs/Augent
