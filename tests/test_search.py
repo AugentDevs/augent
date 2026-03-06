@@ -1,14 +1,12 @@
 """Tests for the search module."""
 
-import pytest
 from augent.search import (
     KeywordSearcher,
-    find_keyword_matches,
-    search_with_proximity,
-    format_timestamp,
     clean_word,
+    find_keyword_matches,
+    format_timestamp,
+    search_with_proximity,
 )
-
 
 # Sample word data for testing
 SAMPLE_WORDS = [
@@ -130,10 +128,7 @@ class TestProximitySearch:
     def test_finds_nearby_keywords(self):
         searcher = KeywordSearcher()
         matches = searcher.search_proximity(
-            SAMPLE_WORDS,
-            "startup",
-            "funding",
-            max_distance=10
+            SAMPLE_WORDS, "startup", "funding", max_distance=10
         )
 
         assert len(matches) >= 1
@@ -144,18 +139,12 @@ class TestProximitySearch:
 
         # With large distance - should find
         matches_large = searcher.search_proximity(
-            SAMPLE_WORDS,
-            "startup",
-            "money",
-            max_distance=20
+            SAMPLE_WORDS, "startup", "money", max_distance=20
         )
 
         # With small distance - might not find
         matches_small = searcher.search_proximity(
-            SAMPLE_WORDS,
-            "startup",
-            "money",
-            max_distance=2
+            SAMPLE_WORDS, "startup", "money", max_distance=2
         )
 
         assert len(matches_large) >= len(matches_small)
@@ -163,10 +152,7 @@ class TestProximitySearch:
     def test_no_proximity_match(self):
         searcher = KeywordSearcher()
         matches = searcher.search_proximity(
-            SAMPLE_WORDS,
-            "nonexistent1",
-            "nonexistent2",
-            max_distance=10
+            SAMPLE_WORDS, "nonexistent1", "nonexistent2", max_distance=10
         )
 
         assert len(matches) == 0
@@ -184,11 +170,7 @@ class TestFindKeywordMatches:
         assert "snippet" in matches[0]
 
     def test_custom_context(self):
-        matches = find_keyword_matches(
-            SAMPLE_WORDS,
-            ["funding"],
-            context_words=5
-        )
+        matches = find_keyword_matches(SAMPLE_WORDS, ["funding"], context_words=5)
 
         assert len(matches) == 1
         # Longer context should have more words
@@ -200,10 +182,7 @@ class TestSearchWithProximity:
 
     def test_returns_dict_format(self):
         matches = search_with_proximity(
-            SAMPLE_WORDS,
-            "startup",
-            "funding",
-            max_distance=10
+            SAMPLE_WORDS, "startup", "funding", max_distance=10
         )
 
         assert isinstance(matches, list)

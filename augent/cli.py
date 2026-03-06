@@ -17,34 +17,37 @@ import os
 import platform
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def _strip_quarantine(path: str) -> None:
     """Remove macOS quarantine flag from a file."""
     if platform.system() == "Darwin":
         try:
-            subprocess.run(["xattr", "-d", "com.apple.quarantine", path], capture_output=True)
+            subprocess.run(
+                ["xattr", "-d", "com.apple.quarantine", path], capture_output=True
+            )
         except Exception:
             pass
 
+
+from .clips import export_clips
 from .core import (
-    search_audio,
-    search_audio_full,
-    transcribe_audio,
-    transcribe_audio_streaming,
-    search_audio_proximity,
-    get_memory_stats,
+    TranscriptionProgress,
     clear_memory,
     clear_model_cache,
+    get_memory_stats,
     list_memories,
-    TranscriptionProgress
+    search_audio,
+    search_audio_full,
+    search_audio_proximity,
+    transcribe_audio,
+    transcribe_audio_streaming,
 )
-from .search import find_keyword_matches
 from .export import export_matches, export_transcription
-from .clips import export_clips
+from .search import find_keyword_matches
 
 
 def print_progress(progress: TranscriptionProgress, quiet: bool = False):
@@ -63,33 +66,23 @@ def print_progress(progress: TranscriptionProgress, quiet: bool = False):
 
 
 def process_single_file(
-    audio_path: str,
-    keywords: List[str],
-    args: argparse.Namespace
+    audio_path: str, keywords: List[str], args: argparse.Namespace
 ) -> dict:
     """Process a single audio file."""
     if args.full:
         result = search_audio_full(
-            audio_path,
-            keywords,
-            model_size=args.model,
-            use_cache=not args.no_cache
+            audio_path, keywords, model_size=args.model, use_cache=not args.no_cache
         )
     else:
         result = search_audio(
-            audio_path,
-            keywords,
-            model_size=args.model,
-            use_cache=not args.no_cache
+            audio_path, keywords, model_size=args.model, use_cache=not args.no_cache
         )
 
     return result
 
 
 def process_batch(
-    audio_paths: List[str],
-    keywords: List[str],
-    args: argparse.Namespace
+    audio_paths: List[str], keywords: List[str], args: argparse.Namespace
 ) -> dict:
     """Process multiple audio files."""
     results = {}
@@ -166,20 +159,13 @@ def cmd_search(args: argparse.Namespace):
             # Stream progress
             transcription = None
             for progress in transcribe_audio_streaming(
-                audio_path,
-                args.model,
-                use_cache=not args.no_cache
+                audio_path, args.model, use_cache=not args.no_cache
             ):
                 print_progress(progress, args.quiet)
 
             # Now search
-            transcription = transcribe_audio(
-                audio_path, args.model, use_cache=True
-            )
-            matches = find_keyword_matches(
-                transcription["words"],
-                keywords
-            )
+            transcription = transcribe_audio(audio_path, args.model, use_cache=True)
+            matches = find_keyword_matches(transcription["words"], keywords)
 
             # Group results
             if args.full:
@@ -187,7 +173,7 @@ def cmd_search(args: argparse.Namespace):
                     "text": transcription["text"],
                     "language": transcription["language"],
                     "duration": transcription["duration"],
-                    "matches": matches
+                    "matches": matches,
                 }
             else:
                 result = {}
@@ -195,11 +181,13 @@ def cmd_search(args: argparse.Namespace):
                     kw = match["keyword"]
                     if kw not in result:
                         result[kw] = []
-                    result[kw].append({
-                        "timestamp": match["timestamp"],
-                        "timestamp_seconds": match["timestamp_seconds"],
-                        "snippet": match["snippet"]
-                    })
+                    result[kw].append(
+                        {
+                            "timestamp": match["timestamp"],
+                            "timestamp_seconds": match["timestamp_seconds"],
+                            "snippet": match["snippet"],
+                        }
+                    )
         else:
             result = process_single_file(audio_path, keywords, args)
             matches = []
@@ -237,10 +225,7 @@ def cmd_search(args: argparse.Namespace):
         audio_for_clips = audio_paths[0] if len(audio_paths) == 1 else None
         if audio_for_clips:
             clips = export_clips(
-                audio_for_clips,
-                matches,
-                args.export_clips,
-                padding=args.clip_padding
+                audio_for_clips, matches, args.export_clips, padding=args.clip_padding
             )
             if not args.quiet:
                 print(f"Exported {len(clips)} clips", file=sys.stderr)
@@ -276,31 +261,25 @@ def cmd_transcribe(args: argparse.Namespace):
     # Stream transcription
     if args.stream and not args.quiet:
         for progress in transcribe_audio_streaming(
-            args.audio,
-            args.model,
-            use_cache=not args.no_cache
+            args.audio, args.model, use_cache=not args.no_cache
         ):
             print_progress(progress, args.quiet)
 
-    transcription = transcribe_audio(
-        args.audio,
-        args.model,
-        use_cache=True
-    )
+    transcription = transcribe_audio(args.audio, args.model, use_cache=True)
 
     # Format output
     if args.format in ("srt", "vtt"):
-        output = export_transcription(
-            transcription["segments"],
-            args.format
-        )
+        output = export_transcription(transcription["segments"], args.format)
     else:
-        output = json.dumps({
-            "text": transcription["text"],
-            "language": transcription["language"],
-            "duration": transcription["duration"],
-            "segments": transcription["segments"]
-        }, indent=2)
+        output = json.dumps(
+            {
+                "text": transcription["text"],
+                "language": transcription["language"],
+                "duration": transcription["duration"],
+                "segments": transcription["segments"],
+            },
+            indent=2,
+        )
 
     if args.output:
         with open(args.output, "w") as f:
@@ -320,7 +299,10 @@ def cmd_proximity(args: argparse.Namespace):
 
     if not args.quiet:
         print(f"Searching: {args.audio}", file=sys.stderr)
-        print(f"Finding '{args.keyword1}' near '{args.keyword2}' (within {args.distance} words)", file=sys.stderr)
+        print(
+            f"Finding '{args.keyword1}' near '{args.keyword2}' (within {args.distance} words)",
+            file=sys.stderr,
+        )
 
     matches = search_audio_proximity(
         args.audio,
@@ -328,7 +310,7 @@ def cmd_proximity(args: argparse.Namespace):
         args.keyword2,
         max_distance=args.distance,
         model_size=args.model,
-        use_cache=not args.no_cache
+        use_cache=not args.no_cache,
     )
 
     # Output
@@ -360,8 +342,10 @@ def cmd_memory(args: argparse.Namespace):
             print(f"Stored transcriptions ({len(entries)}):\n")
             for e in entries:
                 print(f"  {e['title']}")
-                print(f"    Duration: {e['duration_formatted']} | Model: {e['model_size']} | Date: {e['date']}")
-                if e.get('md_path'):
+                print(
+                    f"    Duration: {e['duration_formatted']} | Model: {e['model_size']} | Date: {e['date']}"
+                )
+                if e.get("md_path"):
                     print(f"    Markdown: {e['md_path']}")
                 print()
     elif args.memory_action == "clear":
@@ -374,12 +358,15 @@ def cmd_memory(args: argparse.Namespace):
         query = args.search_query
         if not query:
             print("Error: search requires a query argument", file=sys.stderr)
-            print("Usage: augent memory search \"your query here\"", file=sys.stderr)
+            print('Usage: augent memory search "your query here"', file=sys.stderr)
             sys.exit(1)
         try:
             from .embeddings import search_memory
         except ImportError:
-            print("Error: sentence-transformers not installed. Install with: pip install sentence-transformers", file=sys.stderr)
+            print(
+                "Error: sentence-transformers not installed. Install with: pip install sentence-transformers",
+                file=sys.stderr,
+            )
             sys.exit(1)
         mode = "semantic" if args.semantic else "keyword"
         result = search_memory(query, top_k=args.top_k, mode=mode)
@@ -452,7 +439,9 @@ def _setup_openclaw():
     if has_openclaw:
         print("  \033[32m✓\033[0m OpenClaw detected")
     else:
-        print("  \033[33m!\033[0m OpenClaw not detected — skill files installed for when you set it up")
+        print(
+            "  \033[33m!\033[0m OpenClaw not detected — skill files installed for when you set it up"
+        )
 
     print()
     print("  \033[1mWhat was configured:\033[0m")
@@ -506,7 +495,9 @@ def _write_skill_md(dest: Path, mcp_cmd: Optional[str], python_abs: str):
     if mcp_cmd:
         config_json = '        "command": "augent-mcp"'
     else:
-        config_json = f'        "command": "{python_abs}",\n        "args": ["-m", "augent.mcp"]'
+        config_json = (
+            f'        "command": "{python_abs}",\n        "args": ["-m", "augent.mcp"]'
+        )
 
     content = f"""---
 name: augent
@@ -558,7 +549,8 @@ def cmd_help(args: argparse.Namespace):
 
     try:
         import importlib.metadata
-        version = importlib.metadata.version('augent')
+
+        version = importlib.metadata.version("augent")
     except Exception:
         version = "2026.2.28"
 
@@ -647,7 +639,8 @@ def print_simple_help():
 
     try:
         import importlib.metadata
-        version = importlib.metadata.version('augent')
+
+        version = importlib.metadata.version("augent")
     except Exception:
         version = "2026.2.28"
 
@@ -691,14 +684,14 @@ Docs: https://docs.augent.app
 
 def main():
     # Handle --help and -h with clean output
-    if len(sys.argv) == 1 or sys.argv[1] in ('--help', '-h'):
+    if len(sys.argv) == 1 or sys.argv[1] in ("--help", "-h"):
         print_simple_help()
         sys.exit(0)
 
     parser = argparse.ArgumentParser(
         description="Augent - Audio intelligence for agents",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        add_help=False  # We handle help ourselves
+        add_help=False,  # We handle help ourselves
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
@@ -706,139 +699,121 @@ def main():
     # Search command
     search_parser = subparsers.add_parser("search", help="Search audio for keywords")
     search_parser.add_argument(
-        "audio",
-        nargs="+",
-        help="Audio file(s) or glob pattern (e.g., '*.mp3')"
+        "audio", nargs="+", help="Audio file(s) or glob pattern (e.g., '*.mp3')"
     )
     search_parser.add_argument(
-        "keywords",
-        help="Comma-separated keywords to search for"
+        "keywords", help="Comma-separated keywords to search for"
     )
     search_parser.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default="tiny",
         choices=["tiny", "base", "small", "medium", "large"],
-        help="Whisper model size (default: tiny)"
+        help="Whisper model size (default: tiny)",
     )
     search_parser.add_argument(
-        "--full", "-f",
-        action="store_true",
-        help="Include full transcription in output"
+        "--full", "-f", action="store_true", help="Include full transcription in output"
     )
     search_parser.add_argument(
         "--format",
         default="json",
         choices=["json", "csv", "srt", "vtt", "markdown", "md"],
-        help="Output format (default: json)"
+        help="Output format (default: json)",
     )
-    search_parser.add_argument(
-        "--output", "-o",
-        help="Write output to file"
-    )
+    search_parser.add_argument("--output", "-o", help="Write output to file")
     search_parser.add_argument(
         "--export-clips",
         metavar="DIR",
-        help="Export audio clips around matches to directory"
+        help="Export audio clips around matches to directory",
     )
     search_parser.add_argument(
         "--clip-padding",
         type=float,
         default=5.0,
-        help="Seconds of audio before/after each clip (default: 5)"
+        help="Seconds of audio before/after each clip (default: 5)",
     )
     search_parser.add_argument(
-        "--workers", "-w",
+        "--workers",
+        "-w",
         type=int,
         default=1,
-        help="Parallel workers for batch processing (default: 1)"
+        help="Parallel workers for batch processing (default: 1)",
     )
     search_parser.add_argument(
-        "--stream", "-s",
+        "--stream",
+        "-s",
         action="store_true",
-        help="Stream transcription progress to stderr"
+        help="Stream transcription progress to stderr",
     )
     search_parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable transcription caching"
+        "--no-cache", action="store_true", help="Disable transcription caching"
     )
     search_parser.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Suppress progress messages"
+        "--quiet", "-q", action="store_true", help="Suppress progress messages"
     )
 
     # Transcribe command
     transcribe_parser = subparsers.add_parser(
-        "transcribe",
-        help="Transcribe audio without keyword search"
+        "transcribe", help="Transcribe audio without keyword search"
     )
     transcribe_parser.add_argument("audio", help="Audio file to transcribe")
     transcribe_parser.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default="tiny",
         choices=["tiny", "base", "small", "medium", "large"],
-        help="Whisper model size (default: tiny)"
+        help="Whisper model size (default: tiny)",
     )
     transcribe_parser.add_argument(
         "--format",
         default="json",
         choices=["json", "srt", "vtt"],
-        help="Output format (default: json)"
+        help="Output format (default: json)",
     )
     transcribe_parser.add_argument("--output", "-o", help="Write output to file")
     transcribe_parser.add_argument(
-        "--stream", "-s",
-        action="store_true",
-        help="Stream transcription progress"
+        "--stream", "-s", action="store_true", help="Stream transcription progress"
     )
     transcribe_parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable caching"
+        "--no-cache", action="store_true", help="Disable caching"
     )
     transcribe_parser.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Suppress progress messages"
+        "--quiet", "-q", action="store_true", help="Suppress progress messages"
     )
 
     # Proximity command
     proximity_parser = subparsers.add_parser(
-        "proximity",
-        help="Find keyword1 near keyword2"
+        "proximity", help="Find keyword1 near keyword2"
     )
     proximity_parser.add_argument("audio", help="Audio file to search")
     proximity_parser.add_argument("keyword1", help="Primary keyword")
     proximity_parser.add_argument("keyword2", help="Must appear nearby")
     proximity_parser.add_argument(
-        "--distance", "-d",
+        "--distance",
+        "-d",
         type=int,
         default=30,
-        help="Max words allowed between keyword1 and keyword2 (default: 30)"
+        help="Max words allowed between keyword1 and keyword2 (default: 30)",
     )
     proximity_parser.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default="tiny",
         choices=["tiny", "base", "small", "medium", "large"],
-        help="Whisper model size (default: tiny)"
+        help="Whisper model size (default: tiny)",
     )
     proximity_parser.add_argument(
         "--format",
         default="json",
         choices=["json", "csv", "markdown"],
-        help="Output format (default: json)"
+        help="Output format (default: json)",
     )
     proximity_parser.add_argument("--output", "-o", help="Write output to file")
     proximity_parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable caching"
+        "--no-cache", action="store_true", help="Disable caching"
     )
     proximity_parser.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Suppress progress messages"
+        "--quiet", "-q", action="store_true", help="Suppress progress messages"
     )
 
     # Memory command
@@ -846,35 +821,34 @@ def main():
     memory_parser.add_argument(
         "memory_action",
         choices=["stats", "list", "clear", "clear-models", "search"],
-        help="Memory action"
+        help="Memory action",
     )
     memory_parser.add_argument(
-        "search_query",
-        nargs="?",
-        help="Search query (required for 'search' action)"
+        "search_query", nargs="?", help="Search query (required for 'search' action)"
     )
     memory_parser.add_argument(
-        "--top-k", "-k",
+        "--top-k",
+        "-k",
         type=int,
         default=10,
-        help="Number of results for search (default: 10)"
+        help="Number of results for search (default: 10)",
     )
     memory_parser.add_argument(
         "--semantic",
         action="store_true",
-        help="Use semantic (meaning-based) search instead of keyword matching"
+        help="Use semantic (meaning-based) search instead of keyword matching",
     )
 
     # Setup command
-    setup_parser = subparsers.add_parser("setup", help="Configure augent for a platform")
+    setup_parser = subparsers.add_parser(
+        "setup", help="Configure augent for a platform"
+    )
     setup_parser.add_argument(
-        "setup_target",
-        choices=["openclaw"],
-        help="Platform to configure (openclaw)"
+        "setup_target", choices=["openclaw"], help="Platform to configure (openclaw)"
     )
 
     # Help command
-    help_parser = subparsers.add_parser("help", help="Show detailed help and quick start guide")
+    subparsers.add_parser("help", help="Show detailed help and quick start guide")
 
     # Parse and dispatch
     args = parser.parse_args()

@@ -113,6 +113,8 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -123,7 +125,13 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (handled by black)
+    "E402",  # module-level import not at top (intentional lazy imports)
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.per-file-ignores]
+"augent/__init__.py" = ["F401"]  # re-exports
+"augent/mcp.py" = ["F401"]      # availability checks (try/import/except)
+"augent/clips.py" = ["F401"]    # availability check (pydub)
+
+[tool.ruff.lint.isort]
 known-first-party = ["augent"]

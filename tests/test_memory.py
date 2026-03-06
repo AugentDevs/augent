@@ -3,11 +3,13 @@
 import os
 import sqlite3
 import tempfile
+
 import pytest
+
 from augent.memory import (
-    TranscriptionMemory,
-    ModelCache,
     MemorizedTranscription,
+    ModelCache,
+    TranscriptionMemory,
 )
 
 
@@ -39,7 +41,7 @@ class TestTranscriptionMemory:
             "language": "en",
             "duration": 10.5,
             "words": [{"word": "Hello", "start": 0.0, "end": 0.5}],
-            "segments": [{"start": 0.0, "end": 1.0, "text": "Hello world"}]
+            "segments": [{"start": 0.0, "end": 1.0, "text": "Hello world"}],
         }
 
         temp_memory.set(sample_audio_file, "base", transcription)
@@ -58,14 +60,14 @@ class TestTranscriptionMemory:
             "language": "en",
             "duration": 10.0,
             "words": [],
-            "segments": []
+            "segments": [],
         }
         trans_large = {
             "text": "Large transcription",
             "language": "en",
             "duration": 10.0,
             "words": [],
-            "segments": []
+            "segments": [],
         }
 
         temp_memory.set(sample_audio_file, "base", trans_base)
@@ -83,7 +85,7 @@ class TestTranscriptionMemory:
             "language": "en",
             "duration": 5.0,
             "words": [],
-            "segments": []
+            "segments": [],
         }
 
         temp_memory.set(sample_audio_file, "base", transcription)
@@ -99,7 +101,7 @@ class TestTranscriptionMemory:
             "language": "en",
             "duration": 100.0,
             "words": [],
-            "segments": []
+            "segments": [],
         }
 
         # Empty memory
@@ -126,8 +128,11 @@ class TestTranscriptionMemory:
 
     def test_set_populates_title(self, temp_memory, sample_audio_file):
         transcription = {
-            "text": "Test", "language": "en", "duration": 5.0,
-            "words": [], "segments": []
+            "text": "Test",
+            "language": "en",
+            "duration": 5.0,
+            "words": [],
+            "segments": [],
         }
         temp_memory.set(sample_audio_file, "base", transcription)
         result = temp_memory.get(sample_audio_file, "base")
@@ -140,7 +145,9 @@ class TestTranscriptionMemory:
             "language": "en",
             "duration": 10.5,
             "words": [{"word": "Hello", "start": 0.0, "end": 0.5}],
-            "segments": [{"start": 0.0, "end": 5.0, "text": "Hello world this is a test"}]
+            "segments": [
+                {"start": 0.0, "end": 5.0, "text": "Hello world this is a test"}
+            ],
         }
         temp_memory.set(sample_audio_file, "base", transcription)
 
@@ -157,7 +164,7 @@ class TestTranscriptionMemory:
             "language": "en",
             "duration": 125.0,
             "words": [],
-            "segments": [{"start": 0.0, "end": 5.0, "text": "Test content"}]
+            "segments": [{"start": 0.0, "end": 5.0, "text": "Test content"}],
         }
         temp_memory.set(sample_audio_file, "base", transcription)
 
@@ -168,8 +175,11 @@ class TestTranscriptionMemory:
 
     def test_get_by_title(self, temp_memory, sample_audio_file):
         transcription = {
-            "text": "Test", "language": "en", "duration": 5.0,
-            "words": [], "segments": []
+            "text": "Test",
+            "language": "en",
+            "duration": 5.0,
+            "words": [],
+            "segments": [],
         }
         temp_memory.set(sample_audio_file, "base", transcription)
 
@@ -189,8 +199,11 @@ class TestTranscriptionMemory:
 
     def test_list_all_with_entries(self, temp_memory, sample_audio_file):
         transcription = {
-            "text": "Test", "language": "en", "duration": 120.0,
-            "words": [], "segments": []
+            "text": "Test",
+            "language": "en",
+            "duration": 120.0,
+            "words": [],
+            "segments": [],
         }
         temp_memory.set(sample_audio_file, "base", transcription)
 
@@ -203,8 +216,11 @@ class TestTranscriptionMemory:
 
     def test_clear_removes_markdown_files(self, temp_memory, sample_audio_file):
         transcription = {
-            "text": "Test", "language": "en", "duration": 5.0,
-            "words": [], "segments": [{"start": 0.0, "end": 5.0, "text": "Test"}]
+            "text": "Test",
+            "language": "en",
+            "duration": 5.0,
+            "words": [],
+            "segments": [{"start": 0.0, "end": 5.0, "text": "Test"}],
         }
         temp_memory.set(sample_audio_file, "base", transcription)
 
@@ -327,7 +343,7 @@ class TestMemorizedTranscription:
             words=[],
             segments=[],
             created_at=1234567890.0,
-            file_path="/path/to/audio.mp3"
+            file_path="/path/to/audio.mp3",
         )
 
         assert stored.audio_hash == "abc123"
@@ -348,7 +364,7 @@ class TestMemorizedTranscription:
             segments=[],
             created_at=1234567890.0,
             file_path="/path/to/audio.mp3",
-            title="My Podcast"
+            title="My Podcast",
         )
 
         assert stored.title == "My Podcast"

@@ -12,16 +12,17 @@ Features:
 """
 
 import os
-from typing import Optional, List, Dict, Any, Generator, Callable, Tuple
 from dataclasses import dataclass
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
-from .memory import get_transcription_memory, get_model_cache
-from .search import find_keyword_matches, search_with_proximity, KeywordSearcher
+from .memory import get_model_cache, get_transcription_memory
+from .search import find_keyword_matches, search_with_proximity
 
 
 @dataclass
 class TranscriptionProgress:
     """Progress update during transcription."""
+
     status: str
     progress: float
     message: str
@@ -34,7 +35,7 @@ def transcribe_audio(
     use_cache: bool = True,
     device: str = "auto",
     compute_type: str = "auto",
-    language: Optional[str] = None
+    language: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Transcribe an audio file using faster-whisper.
@@ -63,16 +64,13 @@ def transcribe_audio(
                 "duration": stored.duration,
                 "segments": stored.segments,
                 "words": stored.words,
-                "cached": True
+                "cached": True,
             }
 
     model_cache = get_model_cache()
     model = model_cache.get(model_size, device, compute_type)
 
-    transcribe_options = {
-        "word_timestamps": True,
-        "vad_filter": True
-    }
+    transcribe_options = {"word_timestamps": True, "vad_filter": True}
     if language:
         transcribe_options["language"] = language
 
@@ -82,20 +80,14 @@ def transcribe_audio(
     words = []
 
     for segment in segments_gen:
-        seg_dict = {
-            "start": segment.start,
-            "end": segment.end,
-            "text": segment.text
-        }
+        seg_dict = {"start": segment.start, "end": segment.end, "text": segment.text}
         segments.append(seg_dict)
 
         if segment.words:
             for word in segment.words:
-                words.append({
-                    "word": word.word.strip(),
-                    "start": word.start,
-                    "end": word.end
-                })
+                words.append(
+                    {"word": word.word.strip(), "start": word.start, "end": word.end}
+                )
 
     result = {
         "text": " ".join(s["text"].strip() for s in segments),
@@ -103,7 +95,7 @@ def transcribe_audio(
         "duration": info.duration,
         "segments": segments,
         "words": words,
-        "cached": False
+        "cached": False,
     }
 
     if use_cache:
@@ -120,7 +112,7 @@ def transcribe_audio_streaming(
     device: str = "auto",
     compute_type: str = "auto",
     language: Optional[str] = None,
-    on_progress: Optional[Callable[[TranscriptionProgress], None]] = None
+    on_progress: Optional[Callable[[TranscriptionProgress], None]] = None,
 ) -> Generator[TranscriptionProgress, None, Dict[str, Any]]:
     """Transcribe audio with streaming progress updates."""
     if not os.path.exists(audio_path):
@@ -131,9 +123,7 @@ def transcribe_audio_streaming(
         stored = memory.get(audio_path, model_size)
         if stored:
             progress = TranscriptionProgress(
-                status="complete",
-                progress=1.0,
-                message="Loaded from memory"
+                status="complete", progress=1.0, message="Loaded from memory"
             )
             if on_progress:
                 on_progress(progress)
@@ -145,13 +135,11 @@ def transcribe_audio_streaming(
                 "duration": stored.duration,
                 "segments": stored.segments,
                 "words": stored.words,
-                "cached": True
+                "cached": True,
             }
 
     progress = TranscriptionProgress(
-        status="loading_model",
-        progress=0.0,
-        message=f"Loading {model_size} model..."
+        status="loading_model", progress=0.0, message=f"Loading {model_size} model..."
     )
     if on_progress:
         on_progress(progress)
@@ -161,18 +149,13 @@ def transcribe_audio_streaming(
     model = model_cache.get(model_size, device, compute_type)
 
     progress = TranscriptionProgress(
-        status="transcribing",
-        progress=0.05,
-        message="Starting transcription..."
+        status="transcribing", progress=0.05, message="Starting transcription..."
     )
     if on_progress:
         on_progress(progress)
     yield progress
 
-    transcribe_options = {
-        "word_timestamps": True,
-        "vad_filter": True
-    }
+    transcribe_options = {"word_timestamps": True, "vad_filter": True}
     if language:
         transcribe_options["language"] = language
 
@@ -183,20 +166,14 @@ def transcribe_audio_streaming(
     duration = info.duration if info.duration else 1.0
 
     for segment in segments_gen:
-        seg_dict = {
-            "start": segment.start,
-            "end": segment.end,
-            "text": segment.text
-        }
+        seg_dict = {"start": segment.start, "end": segment.end, "text": segment.text}
         segments.append(seg_dict)
 
         if segment.words:
             for word in segment.words:
-                words.append({
-                    "word": word.word.strip(),
-                    "start": word.start,
-                    "end": word.end
-                })
+                words.append(
+                    {"word": word.word.strip(), "start": word.start, "end": word.end}
+                )
 
         progress_pct = min(0.95, segment.end / duration)
 
@@ -204,7 +181,7 @@ def transcribe_audio_streaming(
             status="segment",
             progress=progress_pct,
             message=f"[{_format_timestamp(segment.start)}] {segment.text.strip()}",
-            segment=seg_dict
+            segment=seg_dict,
         )
         if on_progress:
             on_progress(progress)
@@ -216,7 +193,7 @@ def transcribe_audio_streaming(
         "duration": info.duration,
         "segments": segments,
         "words": words,
-        "cached": False
+        "cached": False,
     }
 
     if use_cache:
@@ -226,7 +203,7 @@ def transcribe_audio_streaming(
     progress = TranscriptionProgress(
         status="complete",
         progress=1.0,
-        message=f"Complete. Duration: {_format_timestamp(info.duration)}"
+        message=f"Complete. Duration: {_format_timestamp(info.duration)}",
     )
     if on_progress:
         on_progress(progress)
@@ -245,7 +222,7 @@ def search_audio(
     audio_path: str,
     keywords: List[str],
     model_size: str = "tiny",
-    use_cache: bool = True
+    use_cache: bool = True,
 ) -> Dict[str, List[Dict]]:
     """
     Main function: transcribe audio and search for keywords.
@@ -268,11 +245,13 @@ def search_audio(
         kw = match["keyword"]
         if kw not in grouped:
             grouped[kw] = []
-        grouped[kw].append({
-            "timestamp": match["timestamp"],
-            "timestamp_seconds": match["timestamp_seconds"],
-            "snippet": match["snippet"]
-        })
+        grouped[kw].append(
+            {
+                "timestamp": match["timestamp"],
+                "timestamp_seconds": match["timestamp_seconds"],
+                "snippet": match["snippet"],
+            }
+        )
 
     return grouped
 
@@ -281,7 +260,7 @@ def search_audio_full(
     audio_path: str,
     keywords: List[str],
     model_size: str = "tiny",
-    use_cache: bool = True
+    use_cache: bool = True,
 ) -> Dict[str, Any]:
     """Full output including transcription metadata."""
     transcription = transcribe_audio(audio_path, model_size, use_cache=use_cache)
@@ -293,7 +272,7 @@ def search_audio_full(
         "language": transcription["language"],
         "duration": transcription["duration"],
         "cached": transcription.get("cached", False),
-        "matches": matches
+        "matches": matches,
     }
 
 
@@ -301,12 +280,14 @@ def search_audio_streaming(
     audio_path: str,
     keywords: List[str],
     model_size: str = "tiny",
-    use_cache: bool = True
+    use_cache: bool = True,
 ) -> Generator[Tuple[TranscriptionProgress, List[Dict]], None, Dict[str, Any]]:
     """Search audio with streaming progress."""
     all_matches = []
 
-    for progress in transcribe_audio_streaming(audio_path, model_size, use_cache=use_cache):
+    for progress in transcribe_audio_streaming(
+        audio_path, model_size, use_cache=use_cache
+    ):
         yield (progress, all_matches)
         if progress.status == "complete":
             break
@@ -319,18 +300,20 @@ def search_audio_streaming(
         kw = match["keyword"]
         if kw not in grouped:
             grouped[kw] = []
-        grouped[kw].append({
-            "timestamp": match["timestamp"],
-            "timestamp_seconds": match["timestamp_seconds"],
-            "snippet": match["snippet"]
-        })
+        grouped[kw].append(
+            {
+                "timestamp": match["timestamp"],
+                "timestamp_seconds": match["timestamp_seconds"],
+                "snippet": match["snippet"],
+            }
+        )
 
     return {
         "text": transcription["text"],
         "language": transcription["language"],
         "duration": transcription["duration"],
         "matches": grouped,
-        "total_matches": len(all_matches)
+        "total_matches": len(all_matches),
     }
 
 
@@ -340,16 +323,13 @@ def search_audio_proximity(
     keyword2: str,
     max_distance: int = 30,
     model_size: str = "tiny",
-    use_cache: bool = True
+    use_cache: bool = True,
 ) -> List[Dict]:
     """Find where keyword1 appears near keyword2."""
     transcription = transcribe_audio(audio_path, model_size, use_cache=use_cache)
 
     return search_with_proximity(
-        transcription["words"],
-        keyword1,
-        keyword2,
-        max_distance
+        transcription["words"], keyword1, keyword2, max_distance
     )
 
 

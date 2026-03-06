@@ -37,9 +37,9 @@ Add to Claude Code project (.mcp.json):
 
 """
 
+import json
 import os
 import sys
-import json
 from typing import Any
 
 # Check for required dependencies before importing
@@ -55,35 +55,44 @@ except ImportError:
     _MISSING_DEPS.append("torch")
 
 if _MISSING_DEPS:
+
     def _dependency_error():
         return {
             "error": f"Missing dependencies: {', '.join(_MISSING_DEPS)}. "
-                     f"Install with: pip install {' '.join(_MISSING_DEPS)}"
+            f"Install with: pip install {' '.join(_MISSING_DEPS)}"
         }
+
     # Create stub functions that return errors
     def search_audio(*args, **kwargs):
         raise RuntimeError(_dependency_error()["error"])
+
     def search_audio_full(*args, **kwargs):
         raise RuntimeError(_dependency_error()["error"])
+
     def transcribe_audio(*args, **kwargs):
         raise RuntimeError(_dependency_error()["error"])
+
     def search_audio_proximity(*args, **kwargs):
         raise RuntimeError(_dependency_error()["error"])
+
     def get_memory_stats():
         return _dependency_error()
+
     def clear_memory():
         return 0
+
     def list_memories():
         return []
+
 else:
     from .core import (
+        clear_memory,
+        get_memory_stats,
+        list_memories,
         search_audio,
         search_audio_full,
-        transcribe_audio,
         search_audio_proximity,
-        get_memory_stats,
-        clear_memory,
-        list_memories
+        transcribe_audio,
     )
 
 # Optional dependencies (sentence-transformers, simple-diarizer, kokoro)
@@ -100,13 +109,13 @@ def send_response(response: dict) -> None:
 
 def _strip_quarantine(path: str) -> None:
     """Remove macOS quarantine flag from a file."""
-    import subprocess
     import platform
+    import subprocess
+
     if platform.system() == "Darwin":
         try:
             subprocess.run(
-                ["xattr", "-d", "com.apple.quarantine", path],
-                capture_output=True
+                ["xattr", "-d", "com.apple.quarantine", path], capture_output=True
             )
         except Exception:
             pass
@@ -153,7 +162,7 @@ def _write_csv(path: str, rows: list, columns: list) -> None:
     import io
     import re
 
-    bold_pattern = re.compile(r'\*\*(.+?)\*\*')
+    bold_pattern = re.compile(r"\*\*(.+?)\*\*")
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -178,7 +187,7 @@ def _write_csv(path: str, rows: list, columns: list) -> None:
         for c in columns:
             v = row.get(c, "")
             if isinstance(v, str):
-                v = bold_pattern.sub(r'\1', v)
+                v = bold_pattern.sub(r"\1", v)
                 v = v.replace("...", "").strip()
             vals.append(v)
         writer.writerow(vals)
@@ -188,34 +197,33 @@ def _write_csv(path: str, rows: list, columns: list) -> None:
 
 
 def _write_xlsx(
-    path: str, rows: list, columns: list,
-    bold_columns: list, keyword_column: str = None
+    path: str, rows: list, columns: list, bold_columns: list, keyword_column: str = None
 ) -> None:
     """Write styled XLSX file with bold headers, timestamps, and keywords."""
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     except ImportError:
         # Fallback to CSV if openpyxl not installed
         _write_csv(path.replace(".xlsx", ".csv"), rows, columns)
         return
 
     import re
-    bold_pattern = re.compile(r'\*\*(.+?)\*\*')
+
+    bold_pattern = re.compile(r"\*\*(.+?)\*\*")
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Results"
 
     # Styles
-    header_font = Font(bold=True, size=11)
-    header_fill = PatternFill(start_color="1F1F1F", end_color="1F1F1F", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="1F1F1F", end_color="1F1F1F", fill_type="solid"
+    )
     header_font_white = Font(bold=True, size=11, color="FFFFFF")
     bold_font = Font(bold=True, size=10)
     normal_font = Font(size=10)
-    thin_border = Border(
-        bottom=Side(style="thin", color="E0E0E0")
-    )
+    thin_border = Border(bottom=Side(style="thin", color="E0E0E0"))
 
     # Column names
     header_names = {
@@ -233,7 +241,9 @@ def _write_xlsx(
 
     # Write header row
     for col_idx, col_key in enumerate(columns, 1):
-        cell = ws.cell(row=1, column=col_idx, value=header_names.get(col_key, col_key.title()))
+        cell = ws.cell(
+            row=1, column=col_idx, value=header_names.get(col_key, col_key.title())
+        )
         cell.font = header_font_white
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal="left")
@@ -243,7 +253,7 @@ def _write_xlsx(
         for col_idx, col_key in enumerate(columns, 1):
             val = row_data.get(col_key, "")
             if isinstance(val, str):
-                val = bold_pattern.sub(r'\1', val)
+                val = bold_pattern.sub(r"\1", val)
                 val = val.replace("...", "").strip()
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
             if col_key in bold_columns:
@@ -260,431 +270,475 @@ def _write_xlsx(
             for cell in row:
                 if cell.value:
                     max_len = max(max_len, min(len(str(cell.value)), 80))
-        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max_len + 4
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = (
+            max_len + 4
+        )
 
     wb.save(path)
 
 
 def send_error(id: Any, code: int, message: str) -> None:
     """Send JSON-RPC error response."""
-    send_response({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": {"code": code, "message": message}
-    })
+    send_response(
+        {"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
+    )
 
 
 def handle_initialize(id: Any, params: dict) -> None:
     """Handle initialize request."""
-    send_response({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "tools": {}
+    send_response(
+        {
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "augent", "version": "2026.2.28"},
             },
-            "serverInfo": {
-                "name": "augent",
-                "version": "2026.2.28"
-            }
         }
-    })
+    )
 
 
 def handle_tools_list(id: Any) -> None:
     """Handle tools/list request."""
-    send_response({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": {
-            "tools": [
-                {
-                    "name": "download_audio",
-                    "description": "Download audio from video URLs at maximum speed. Built by Augent with speed optimizations (aria2c multi-connection, concurrent fragments). Downloads audio ONLY - never video. Supports YouTube, Vimeo, TikTok, Twitter, SoundCloud, and 1000+ sites.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "url": {
-                                "type": "string",
-                                "description": "Video URL to download audio from (YouTube, Vimeo, TikTok, etc.)"
+    send_response(
+        {
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "tools": [
+                    {
+                        "name": "download_audio",
+                        "description": "Download audio from video URLs at maximum speed. Built by Augent with speed optimizations (aria2c multi-connection, concurrent fragments). Downloads audio ONLY - never video. Supports YouTube, Vimeo, TikTok, Twitter, SoundCloud, and 1000+ sites.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {
+                                    "type": "string",
+                                    "description": "Video URL to download audio from (YouTube, Vimeo, TikTok, etc.)",
+                                },
+                                "output_dir": {
+                                    "type": "string",
+                                    "description": "Directory to save the audio file. Default: ~/Downloads",
+                                },
                             },
-                            "output_dir": {
-                                "type": "string",
-                                "description": "Directory to save the audio file. Default: ~/Downloads"
-                            }
+                            "required": ["url"],
                         },
-                        "required": ["url"]
-                    }
-                },
-                {
-                    "name": "transcribe_audio",
-                    "description": "Transcribe an audio file and return the full text with timestamps. Useful when you need the complete transcription rather than searching for specific keywords.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_path": {
-                                "type": "string",
-                                "description": "Path to the audio file"
+                    },
+                    {
+                        "name": "transcribe_audio",
+                        "description": "Transcribe an audio file and return the full text with timestamps. Useful when you need the complete transcription rather than searching for specific keywords.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_path": {
+                                    "type": "string",
+                                    "description": "Path to the audio file",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
+                                "start": {
+                                    "type": "number",
+                                    "description": "Start transcription at this many seconds into the audio. Default: 0 (beginning)",
+                                },
+                                "duration": {
+                                    "type": "number",
+                                    "description": "Only transcribe this many seconds of audio. Example: 600 = first 10 minutes. Default: full file",
+                                },
+                                "output": {
+                                    "type": "string",
+                                    "description": "Optional file path to save transcription. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting.",
+                                },
                             },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            },
-                            "start": {
-                                "type": "number",
-                                "description": "Start transcription at this many seconds into the audio. Default: 0 (beginning)"
-                            },
-                            "duration": {
-                                "type": "number",
-                                "description": "Only transcribe this many seconds of audio. Example: 600 = first 10 minutes. Default: full file"
-                            },
-                            "output": {
-                                "type": "string",
-                                "description": "Optional file path to save transcription. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting."
-                            }
+                            "required": ["audio_path"],
                         },
-                        "required": ["audio_path"]
-                    }
-                },
-                {
-                    "name": "search_audio",
-                    "description": "Search audio files for keywords and return timestamped matches with context snippets. Useful for finding specific moments in podcasts, interviews, lectures, or any audio content.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_path": {
-                                "type": "string",
-                                "description": "Path to the audio file (MP3, WAV, M4A, etc.)"
+                    },
+                    {
+                        "name": "search_audio",
+                        "description": "Search audio files for keywords and return timestamped matches with context snippets. Useful for finding specific moments in podcasts, interviews, lectures, or any audio content.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_path": {
+                                    "type": "string",
+                                    "description": "Path to the audio file (MP3, WAV, M4A, etc.)",
+                                },
+                                "keywords": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of keywords or phrases to search for",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
+                                "include_full_text": {
+                                    "type": "boolean",
+                                    "description": "Include full transcription text in response. Default: false",
+                                },
+                                "output": {
+                                    "type": "string",
+                                    "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting.",
+                                },
                             },
-                            "keywords": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "List of keywords or phrases to search for"
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            },
-                            "include_full_text": {
-                                "type": "boolean",
-                                "description": "Include full transcription text in response. Default: false"
-                            },
-                            "output": {
-                                "type": "string",
-                                "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting."
-                            }
+                            "required": ["audio_path", "keywords"],
                         },
-                        "required": ["audio_path", "keywords"]
-                    }
-                },
-                {
-                    "name": "deep_search",
-                    "description": "Search audio by meaning, not just keywords.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_path": {
-                                "type": "string",
-                                "description": "Path to the audio file"
+                    },
+                    {
+                        "name": "deep_search",
+                        "description": "Search audio by meaning, not just keywords.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_path": {
+                                    "type": "string",
+                                    "description": "Path to the audio file",
+                                },
+                                "query": {
+                                    "type": "string",
+                                    "description": "Natural language search query (e.g. 'discussion about funding challenges')",
+                                },
+                                "top_k": {
+                                    "type": "integer",
+                                    "description": "Number of results to return. Default: 5",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
+                                "output": {
+                                    "type": "string",
+                                    "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting.",
+                                },
+                                "context_words": {
+                                    "type": "integer",
+                                    "description": "Words of context per result. Default: 25. Use 150 for full evidence blocks when Claude needs to answer a question, not just find a moment.",
+                                },
+                                "dedup_seconds": {
+                                    "type": "number",
+                                    "description": "Merge matches within this many seconds of each other to avoid redundant results. Default: 0 (off). Use 60 for Q&A.",
+                                },
                             },
-                            "query": {
-                                "type": "string",
-                                "description": "Natural language search query (e.g. 'discussion about funding challenges')"
-                            },
-                            "top_k": {
-                                "type": "integer",
-                                "description": "Number of results to return. Default: 5"
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            },
-                            "output": {
-                                "type": "string",
-                                "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting."
-                            },
-                            "context_words": {
-                                "type": "integer",
-                                "description": "Words of context per result. Default: 25. Use 150 for full evidence blocks when Claude needs to answer a question, not just find a moment."
-                            },
-                            "dedup_seconds": {
-                                "type": "number",
-                                "description": "Merge matches within this many seconds of each other to avoid redundant results. Default: 0 (off). Use 60 for Q&A."
-                            }
+                            "required": ["audio_path", "query"],
                         },
-                        "required": ["audio_path", "query"]
-                    }
-                },
-                {
-                    "name": "take_notes",
-                    "description": "Take notes from a URL. Downloads audio, transcribes, and saves .txt to Desktop. This single tool handles the entire pipeline — download, transcribe, and save — when the user asks for notes, summaries, highlights, takeaways, eye-candy, quiz, or any formatted content from a video/audio URL. Returns audio_path for follow-up tools (chapters, search). Also used to SAVE formatted notes: call with save_content to write notes to the file from the previous take_notes call (no url needed).",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "url": {
-                                "type": "string",
-                                "description": "Video/audio URL to take notes from (YouTube, Vimeo, TikTok, Twitter, SoundCloud, etc.)"
+                    },
+                    {
+                        "name": "take_notes",
+                        "description": "Take notes from a URL. Downloads audio, transcribes, and saves .txt to Desktop. This single tool handles the entire pipeline — download, transcribe, and save — when the user asks for notes, summaries, highlights, takeaways, eye-candy, quiz, or any formatted content from a video/audio URL. Returns audio_path for follow-up tools (chapters, search). Also used to SAVE formatted notes: call with save_content to write notes to the file from the previous take_notes call (no url needed).",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {
+                                    "type": "string",
+                                    "description": "Video/audio URL to take notes from (YouTube, Vimeo, TikTok, Twitter, SoundCloud, etc.)",
+                                },
+                                "save_content": {
+                                    "type": "string",
+                                    "description": "Formatted notes content to save. When provided, writes this content to the file from the previous take_notes call. No url needed.",
+                                },
+                                "output_dir": {
+                                    "type": "string",
+                                    "description": "Directory to save the .txt notes file. Default: ~/Desktop",
+                                },
+                                "style": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tldr",
+                                        "notes",
+                                        "highlight",
+                                        "eye-candy",
+                                        "quiz",
+                                    ],
+                                    "description": "Note style. tldr > notes > highlight > eye-candy increases formatting richness. quiz generates questions. Default: notes. Pick based on what the user asks for.",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
+                                "read_aloud": {
+                                    "type": "boolean",
+                                    "description": "Generate a spoken audio summary and embed it in the notes for Obsidian playback. Default: false",
+                                },
                             },
-                            "save_content": {
-                                "type": "string",
-                                "description": "Formatted notes content to save. When provided, writes this content to the file from the previous take_notes call. No url needed."
-                            },
-                            "output_dir": {
-                                "type": "string",
-                                "description": "Directory to save the .txt notes file. Default: ~/Desktop"
-                            },
-                            "style": {
-                                "type": "string",
-                                "enum": ["tldr", "notes", "highlight", "eye-candy", "quiz"],
-                                "description": "Note style. tldr > notes > highlight > eye-candy increases formatting richness. quiz generates questions. Default: notes. Pick based on what the user asks for."
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            },
-                            "read_aloud": {
-                                "type": "boolean",
-                                "description": "Generate a spoken audio summary and embed it in the notes for Obsidian playback. Default: false"
-                            }
-                        }
-                    }
-                },
-                {
-                    "name": "chapters",
-                    "description": "Auto-detect topic chapters in audio.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_path": {
-                                "type": "string",
-                                "description": "Path to the audio file"
-                            },
-                            "sensitivity": {
-                                "type": "number",
-                                "description": "0.0 = many chapters, 1.0 = few chapters. Default: 0.4"
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            }
                         },
-                        "required": ["audio_path"]
-                    }
-                },
-                {
-                    "name": "batch_search",
-                    "description": "Search multiple audio files for keywords in parallel. Ideal for processing podcast libraries, interview collections, or any batch of audio files. Returns aggregated results with file paths.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_paths": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "List of paths to audio files"
+                    },
+                    {
+                        "name": "chapters",
+                        "description": "Auto-detect topic chapters in audio.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_path": {
+                                    "type": "string",
+                                    "description": "Path to the audio file",
+                                },
+                                "sensitivity": {
+                                    "type": "number",
+                                    "description": "0.0 = many chapters, 1.0 = few chapters. Default: 0.4",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
                             },
-                            "keywords": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "List of keywords or phrases to search for"
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            },
-                            "workers": {
-                                "type": "integer",
-                                "description": "Number of parallel workers. Default: 2"
-                            }
+                            "required": ["audio_path"],
                         },
-                        "required": ["audio_paths", "keywords"]
-                    }
-                },
-                {
-                    "name": "text_to_speech",
-                    "description": "Convert text to natural speech audio using Kokoro TTS. Saves an MP3 file. Runs in background — returns a job_id immediately. Call again with job_id to check status. Pass text for raw TTS, or file_path to read a notes file (strips markdown, skips metadata, embeds audio player).",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "job_id": {
-                                "type": "string",
-                                "description": "Check status of a running TTS job. Pass the job_id returned from a previous call."
+                    },
+                    {
+                        "name": "batch_search",
+                        "description": "Search multiple audio files for keywords in parallel. Ideal for processing podcast libraries, interview collections, or any batch of audio files. Returns aggregated results with file paths.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_paths": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of paths to audio files",
+                                },
+                                "keywords": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of keywords or phrases to search for",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
+                                "workers": {
+                                    "type": "integer",
+                                    "description": "Number of parallel workers. Default: 2",
+                                },
                             },
-                            "text": {
-                                "type": "string",
-                                "description": "Text to convert to speech. Either text or file_path is required."
-                            },
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path to a notes file to read aloud. Strips markdown formatting, skips metadata, generates MP3, and embeds audio player in the file."
-                            },
-                            "voice": {
-                                "type": "string",
-                                "description": "Voice ID. American English: af_heart (female, default), af_bella, af_nicole, af_nova, af_sky, am_adam (male), am_eric, am_michael. British English: bf_emma, bf_lily, bm_daniel, bm_george. Also supports Spanish, French, Japanese, Chinese voices."
-                            },
-                            "output_dir": {
-                                "type": "string",
-                                "description": "Directory to save the MP3 file. Default: ~/Desktop"
-                            },
-                            "output_filename": {
-                                "type": "string",
-                                "description": "Custom filename. Auto-generated if not set."
-                            },
-                            "speed": {
-                                "type": "number",
-                                "description": "Speech speed multiplier. Default: 1.0"
-                            }
-                        }
-                    }
-                },
-                {
-                    "name": "search_proximity",
-                    "description": "Find where one keyword appears near another keyword in audio. Useful for finding contextual discussions, e.g., 'startup' near 'funding'.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_path": {
-                                "type": "string",
-                                "description": "Path to the audio file"
-                            },
-                            "keyword1": {
-                                "type": "string",
-                                "description": "Primary keyword to find"
-                            },
-                            "keyword2": {
-                                "type": "string",
-                                "description": "Secondary keyword that must appear nearby"
-                            },
-                            "max_distance": {
-                                "type": "integer",
-                                "description": "Maximum number of words between keywords. Default: 30"
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            },
-                            "output": {
-                                "type": "string",
-                                "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting."
-                            }
+                            "required": ["audio_paths", "keywords"],
                         },
-                        "required": ["audio_path", "keyword1", "keyword2"]
-                    }
-                },
-                {
-                    "name": "identify_speakers",
-                    "description": "Identify who speaks when in audio.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "audio_path": {
-                                "type": "string",
-                                "description": "Path to the audio file"
+                    },
+                    {
+                        "name": "text_to_speech",
+                        "description": "Convert text to natural speech audio using Kokoro TTS. Saves an MP3 file. Runs in background — returns a job_id immediately. Call again with job_id to check status. Pass text for raw TTS, or file_path to read a notes file (strips markdown, skips metadata, embeds audio player).",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "job_id": {
+                                    "type": "string",
+                                    "description": "Check status of a running TTS job. Pass the job_id returned from a previous call.",
+                                },
+                                "text": {
+                                    "type": "string",
+                                    "description": "Text to convert to speech. Either text or file_path is required.",
+                                },
+                                "file_path": {
+                                    "type": "string",
+                                    "description": "Path to a notes file to read aloud. Strips markdown formatting, skips metadata, generates MP3, and embeds audio player in the file.",
+                                },
+                                "voice": {
+                                    "type": "string",
+                                    "description": "Voice ID. American English: af_heart (female, default), af_bella, af_nicole, af_nova, af_sky, am_adam (male), am_eric, am_michael. British English: bf_emma, bf_lily, bm_daniel, bm_george. Also supports Spanish, French, Japanese, Chinese voices.",
+                                },
+                                "output_dir": {
+                                    "type": "string",
+                                    "description": "Directory to save the MP3 file. Default: ~/Desktop",
+                                },
+                                "output_filename": {
+                                    "type": "string",
+                                    "description": "Custom filename. Auto-generated if not set.",
+                                },
+                                "speed": {
+                                    "type": "number",
+                                    "description": "Speech speed multiplier. Default: 1.0",
+                                },
                             },
-                            "num_speakers": {
-                                "type": "integer",
-                                "description": "Number of speakers if known. Auto-detects if not set."
-                            },
-                            "model_size": {
-                                "type": "string",
-                                "enum": ["tiny", "base", "small", "medium", "large"],
-                                "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate."
-                            }
                         },
-                        "required": ["audio_path"]
-                    }
-                },
-                {
-                    "name": "list_files",
-                    "description": "List media files in a directory.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "directory": {
-                                "type": "string",
-                                "description": "Directory path to search"
+                    },
+                    {
+                        "name": "search_proximity",
+                        "description": "Find where one keyword appears near another keyword in audio. Useful for finding contextual discussions, e.g., 'startup' near 'funding'.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_path": {
+                                    "type": "string",
+                                    "description": "Path to the audio file",
+                                },
+                                "keyword1": {
+                                    "type": "string",
+                                    "description": "Primary keyword to find",
+                                },
+                                "keyword2": {
+                                    "type": "string",
+                                    "description": "Secondary keyword that must appear nearby",
+                                },
+                                "max_distance": {
+                                    "type": "integer",
+                                    "description": "Maximum number of words between keywords. Default: 30",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
+                                "output": {
+                                    "type": "string",
+                                    "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting.",
+                                },
                             },
-                            "pattern": {
-                                "type": "string",
-                                "description": "Glob pattern for matching files. Default: all common media formats"
-                            },
-                            "recursive": {
-                                "type": "boolean",
-                                "description": "Search subdirectories. Default: false"
-                            }
+                            "required": ["audio_path", "keyword1", "keyword2"],
                         },
-                        "required": ["directory"]
-                    }
-                },
-                {
-                    "name": "list_memories",
-                    "description": "List all stored transcriptions with their titles, durations, dates, and file paths to markdown files. Useful for browsing what has already been transcribed.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {}
-                    }
-                },
-                {
-                    "name": "memory_stats",
-                    "description": "View transcription memory statistics including number of stored files and total duration.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {}
-                    }
-                },
-                {
-                    "name": "clear_memory",
-                    "description": "Clear the transcription memory to free disk space.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {}
-                    }
-                },
-                {
-                    "name": "search_memory",
-                    "description": "Search across ALL stored transcriptions. No audio_path needed, queries everything in memory. Default mode is 'keyword' (literal match). Use 'semantic' mode for meaning-based search.",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Search query. For keyword mode: a word or phrase to find literally. For semantic mode: a natural language description (e.g. 'discussion about funding challenges')."
+                    },
+                    {
+                        "name": "identify_speakers",
+                        "description": "Identify who speaks when in audio.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "audio_path": {
+                                    "type": "string",
+                                    "description": "Path to the audio file",
+                                },
+                                "num_speakers": {
+                                    "type": "integer",
+                                    "description": "Number of speakers if known. Auto-detects if not set.",
+                                },
+                                "model_size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
+                                    "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size. tiny is already highly accurate.",
+                                },
                             },
-                            "mode": {
-                                "type": "string",
-                                "enum": ["keyword", "semantic"],
-                                "description": "Search mode. 'keyword' (default) finds segments containing the exact word/phrase. 'semantic' finds segments similar in meaning."
-                            },
-                            "top_k": {
-                                "type": "integer",
-                                "description": "Number of results to return. Default: 10"
-                            },
-                            "output": {
-                                "type": "string",
-                                "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting."
-                            },
-                            "context_words": {
-                                "type": "integer",
-                                "description": "Words of context per result. Default: 25. Use 150 for full evidence blocks when Claude needs to answer a question. Semantic mode only."
-                            },
-                            "dedup_seconds": {
-                                "type": "number",
-                                "description": "Merge matches within this many seconds of each other. Default: 0 (off). Semantic mode only."
-                            }
+                            "required": ["audio_path"],
                         },
-                        "required": ["query"]
-                    }
-                },
-            ]
+                    },
+                    {
+                        "name": "list_files",
+                        "description": "List media files in a directory.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "directory": {
+                                    "type": "string",
+                                    "description": "Directory path to search",
+                                },
+                                "pattern": {
+                                    "type": "string",
+                                    "description": "Glob pattern for matching files. Default: all common media formats",
+                                },
+                                "recursive": {
+                                    "type": "boolean",
+                                    "description": "Search subdirectories. Default: false",
+                                },
+                            },
+                            "required": ["directory"],
+                        },
+                    },
+                    {
+                        "name": "list_memories",
+                        "description": "List all stored transcriptions with their titles, durations, dates, and file paths to markdown files. Useful for browsing what has already been transcribed.",
+                        "inputSchema": {"type": "object", "properties": {}},
+                    },
+                    {
+                        "name": "memory_stats",
+                        "description": "View transcription memory statistics including number of stored files and total duration.",
+                        "inputSchema": {"type": "object", "properties": {}},
+                    },
+                    {
+                        "name": "clear_memory",
+                        "description": "Clear the transcription memory to free disk space.",
+                        "inputSchema": {"type": "object", "properties": {}},
+                    },
+                    {
+                        "name": "search_memory",
+                        "description": "Search across ALL stored transcriptions. No audio_path needed, queries everything in memory. Default mode is 'keyword' (literal match). Use 'semantic' mode for meaning-based search.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "description": "Search query. For keyword mode: a word or phrase to find literally. For semantic mode: a natural language description (e.g. 'discussion about funding challenges').",
+                                },
+                                "mode": {
+                                    "type": "string",
+                                    "enum": ["keyword", "semantic"],
+                                    "description": "Search mode. 'keyword' (default) finds segments containing the exact word/phrase. 'semantic' finds segments similar in meaning.",
+                                },
+                                "top_k": {
+                                    "type": "integer",
+                                    "description": "Number of results to return. Default: 10",
+                                },
+                                "output": {
+                                    "type": "string",
+                                    "description": "Optional file path to save results. Use .csv for plain data or .xlsx for styled spreadsheets with bold headers and formatting.",
+                                },
+                                "context_words": {
+                                    "type": "integer",
+                                    "description": "Words of context per result. Default: 25. Use 150 for full evidence blocks when Claude needs to answer a question. Semantic mode only.",
+                                },
+                                "dedup_seconds": {
+                                    "type": "number",
+                                    "description": "Merge matches within this many seconds of each other. Default: 0 (off). Semantic mode only.",
+                                },
+                            },
+                            "required": ["query"],
+                        },
+                    },
+                ]
+            },
         }
-    })
+    )
 
 
 def handle_tools_call(id: Any, params: dict) -> None:
@@ -727,18 +781,15 @@ def handle_tools_call(id: Any, params: dict) -> None:
             send_error(id, -32602, f"Unknown tool: {tool_name}")
             return
 
-        send_response({
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(result, indent=2)
-                    }
-                ]
+        send_response(
+            {
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": {
+                    "content": [{"type": "text", "text": json.dumps(result, indent=2)}]
+                },
             }
-        })
+        )
 
     except FileNotFoundError as e:
         send_error(id, -32602, str(e))
@@ -750,10 +801,10 @@ def handle_tools_call(id: Any, params: dict) -> None:
 
 def handle_download_audio(arguments: dict) -> dict:
     """Handle download_audio tool call."""
-    import subprocess
-    import shutil
     import os
     import re
+    import shutil
+    import subprocess
 
     url = arguments.get("url")
     output_dir = arguments.get("output_dir", os.path.expanduser("~/Downloads"))
@@ -774,15 +825,21 @@ def handle_download_audio(arguments: dict) -> dict:
     # Build command
     cmd = [
         "yt-dlp",
-        "-f", "bestaudio",
-        "--concurrent-fragments", "4",
+        "-f",
+        "bestaudio",
+        "--concurrent-fragments",
+        "4",
         "--no-playlist",
-        "-o", f"{output_dir}/%(title)s.%(ext)s",
-        "--print", "after_move:filepath",  # Print the final file path
+        "-o",
+        f"{output_dir}/%(title)s.%(ext)s",
+        "--print",
+        "after_move:filepath",  # Print the final file path
     ]
 
     if has_aria2c:
-        cmd.extend(["--downloader", "aria2c", "--downloader-args", "aria2c:-x 16 -s 16 -k 1M"])
+        cmd.extend(
+            ["--downloader", "aria2c", "--downloader-args", "aria2c:-x 16 -s 16 -k 1M"]
+        )
 
     cmd.append(url)
 
@@ -794,7 +851,7 @@ def handle_download_audio(arguments: dict) -> dict:
         raise RuntimeError(f"Download failed: {error_msg}")
 
     # Extract the output file path from stdout
-    output_lines = result.stdout.strip().split('\n')
+    output_lines = result.stdout.strip().split("\n")
     output_file = output_lines[-1] if output_lines else None
 
     # Get file info if available
@@ -804,7 +861,7 @@ def handle_download_audio(arguments: dict) -> dict:
         file_info = {
             "path": output_file,
             "filename": os.path.basename(output_file),
-            "size_mb": round(file_size / (1024 * 1024), 2)
+            "size_mb": round(file_size / (1024 * 1024), 2),
         }
 
     return {
@@ -813,7 +870,9 @@ def handle_download_audio(arguments: dict) -> dict:
         "output_dir": output_dir,
         "file": file_info,
         "aria2c_used": has_aria2c,
-        "message": f"Audio downloaded to {output_file}" if output_file else "Download complete"
+        "message": (
+            f"Audio downloaded to {output_file}" if output_file else "Download complete"
+        ),
     }
 
 
@@ -831,15 +890,9 @@ def handle_search_audio(arguments: dict) -> dict:
         raise ValueError("Missing required parameter: keywords")
 
     if include_full:
-        result = search_audio_full(
-            audio_path, keywords,
-            model_size=model_size
-        )
+        result = search_audio_full(audio_path, keywords, model_size=model_size)
     else:
-        result = search_audio(
-            audio_path, keywords,
-            model_size=model_size
-        )
+        result = search_audio(audio_path, keywords, model_size=model_size)
 
     result["model_used"] = model_size
 
@@ -850,12 +903,14 @@ def handle_search_audio(arguments: dict) -> dict:
         for kw, matches in result.items():
             if isinstance(matches, list):
                 for m in matches:
-                    rows.append({
-                        "keyword": kw,
-                        "timestamp": m.get("timestamp", ""),
-                        "timestamp_seconds": m.get("timestamp_seconds", 0),
-                        "snippet": m.get("snippet", ""),
-                    })
+                    rows.append(
+                        {
+                            "keyword": kw,
+                            "timestamp": m.get("timestamp", ""),
+                            "timestamp_seconds": m.get("timestamp_seconds", 0),
+                            "snippet": m.get("snippet", ""),
+                        }
+                    )
         if rows:
             result["output_path"] = _write_output_file(
                 output,
@@ -912,12 +967,14 @@ def handle_transcribe_audio(arguments: dict) -> dict:
         if start:
             e += start
         minutes_s, secs_s = int(s // 60), int(s % 60)
-        segments.append({
-            "start": round(s, 1),
-            "end": round(e, 1),
-            "timestamp": f"{minutes_s}:{secs_s:02d}",
-            "text": seg["text"].strip()
-        })
+        segments.append(
+            {
+                "start": round(s, 1),
+                "end": round(e, 1),
+                "timestamp": f"{minutes_s}:{secs_s:02d}",
+                "text": seg["text"].strip(),
+            }
+        )
 
     # Cap response size to prevent token overflow in Claude Code.
     # For large transcriptions, truncate text and suggest using output param.
@@ -927,7 +984,10 @@ def handle_transcribe_audio(arguments: dict) -> dict:
     truncated = len(full_text) > max_chars or len(segments) > max_segments
 
     if truncated:
-        capped_text = full_text[:max_chars] + "\n\n[... truncated — use the output parameter to export full transcription to .csv or .xlsx ...]"
+        capped_text = (
+            full_text[:max_chars]
+            + "\n\n[... truncated — use the output parameter to export full transcription to .csv or .xlsx ...]"
+        )
         capped_segments = segments[:max_segments]
     else:
         capped_text = full_text
@@ -941,13 +1001,15 @@ def handle_transcribe_audio(arguments: dict) -> dict:
         "segments": capped_segments,
         "segment_count": len(segments),
         "cached": result.get("cached", False),
-        "model_used": model_size
+        "model_used": model_size,
     }
 
     if truncated:
         response["truncated"] = True
         response["full_segment_count"] = len(segments)
-        response["hint"] = "Response was truncated to prevent overflow. Use the output parameter (e.g. output: '~/Desktop/transcript.csv') to get the full transcription."
+        response["hint"] = (
+            "Response was truncated to prevent overflow. Use the output parameter (e.g. output: '~/Desktop/transcript.csv') to get the full transcription."
+        )
 
     # Write output file if requested
     if output:
@@ -978,16 +1040,14 @@ def handle_search_proximity(arguments: dict) -> dict:
         raise ValueError("Missing required parameter: keyword2")
 
     matches = search_audio_proximity(
-        audio_path, keyword1, keyword2,
-        max_distance=max_distance,
-        model_size=model_size
+        audio_path, keyword1, keyword2, max_distance=max_distance, model_size=model_size
     )
 
     result = {
         "query": f"'{keyword1}' within {max_distance} words of '{keyword2}'",
         "match_count": len(matches),
         "matches": matches,
-        "model_used": model_size
+        "model_used": model_size,
     }
 
     # Write output file if requested
@@ -1042,9 +1102,9 @@ def handle_batch_search(arguments: dict) -> dict:
 
     # Aggregate stats
     total_matches = 0
-    for path, file_results in results.items():
+    for _path, file_results in results.items():
         if "error" not in file_results:
-            for kw, matches in file_results.items():
+            for _kw, matches in file_results.items():
                 total_matches += len(matches)
 
     return {
@@ -1053,16 +1113,25 @@ def handle_batch_search(arguments: dict) -> dict:
         "total_matches": total_matches,
         "results": results,
         "errors": errors if errors else None,
-        "model_used": model_size
+        "model_used": model_size,
     }
 
 
 def handle_list_files(arguments: dict) -> dict:
     """Handle list_files tool call."""
-    import os
     import glob as glob_module
+    import os
 
-    DEFAULT_PATTERNS = ["*.mp3", "*.m4a", "*.wav", "*.webm", "*.mp4", "*.mkv", "*.ogg", "*.flac"]
+    DEFAULT_PATTERNS = [
+        "*.mp3",
+        "*.m4a",
+        "*.wav",
+        "*.webm",
+        "*.mp4",
+        "*.mkv",
+        "*.ogg",
+        "*.flac",
+    ]
 
     directory = arguments.get("directory")
     pattern = arguments.get("pattern")
@@ -1097,11 +1166,13 @@ def handle_list_files(arguments: dict) -> dict:
     for f in files:
         try:
             size = os.path.getsize(f)
-            audio_files.append({
-                "path": f,
-                "name": os.path.basename(f),
-                "size_mb": round(size / (1024 * 1024), 2)
-            })
+            audio_files.append(
+                {
+                    "path": f,
+                    "name": os.path.basename(f),
+                    "size_mb": round(size / (1024 * 1024), 2),
+                }
+            )
         except OSError:
             pass
 
@@ -1110,7 +1181,7 @@ def handle_list_files(arguments: dict) -> dict:
         "pattern": pattern,
         "recursive": recursive,
         "count": len(audio_files),
-        "files": audio_files
+        "files": audio_files,
     }
 
 
@@ -1122,10 +1193,7 @@ def handle_memory_stats(arguments: dict) -> dict:
 def handle_clear_memory(arguments: dict) -> dict:
     """Handle clear_memory tool call."""
     count = clear_memory()
-    return {
-        "cleared": count,
-        "message": f"Cleared {count} stored transcription(s)"
-    }
+    return {"cleared": count, "message": f"Cleared {count} stored transcription(s)"}
 
 
 def handle_list_memories(arguments: dict) -> dict:
@@ -1134,11 +1202,17 @@ def handle_list_memories(arguments: dict) -> dict:
     return {
         "count": len(entries),
         "transcriptions": entries,
-        "message": f"Found {len(entries)} stored transcription(s)"
+        "message": f"Found {len(entries)} stored transcription(s)",
     }
 
 
-def _get_style_instruction(style: str, read_aloud: bool = False, output_dir: str = "~/Desktop", safe_title: str = "", txt_path: str = "") -> str:
+def _get_style_instruction(
+    style: str,
+    read_aloud: bool = False,
+    output_dir: str = "~/Desktop",
+    safe_title: str = "",
+    txt_path: str = "",
+) -> str:
     """Return formatting instructions for a given note style."""
 
     base_prefix = (
@@ -1149,16 +1223,17 @@ def _get_style_instruction(style: str, read_aloud: bool = False, output_dir: str
     )
     label = "Quiz" if style == "quiz" else "Notes"
     base_suffix = (
-        "\n\nSave the final notes by calling: take_notes(save_content=\"<your formatted notes>\"). "
+        '\n\nSave the final notes by calling: take_notes(save_content="<your formatted notes>"). '
         "Do NOT use the Write tool. "
         f"After saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
     )
 
     if read_aloud:
-        import os as _os, shutil as _shutil
-        _obsidian_installed = (
-            _os.path.exists("/Applications/Obsidian.app")
-            or bool(_shutil.which("obsidian"))
+        import os as _os
+        import shutil as _shutil
+
+        _obsidian_installed = _os.path.exists("/Applications/Obsidian.app") or bool(
+            _shutil.which("obsidian")
         )
         audio_filename = f"{safe_title}.mp3" if safe_title else "notes_audio.mp3"
         if _obsidian_installed:
@@ -1170,7 +1245,7 @@ def _get_style_instruction(style: str, read_aloud: bool = False, output_dir: str
         else:
             embed_instruction = ""
         base_suffix = (
-            "\n\nSave the final notes by calling: take_notes(save_content=\"<your formatted notes>\"). "
+            '\n\nSave the final notes by calling: take_notes(save_content="<your formatted notes>"). '
             "Do NOT use the Write tool. "
             "THEN: Take the notes you just wrote — SKIP the title, source URL, duration, date, and any metadata lines at the top. Start from the first real content section heading. Take that content and "
             "strip the markdown formatting (remove #, **, -, >, ![], ---, callout syntax, links) "
@@ -1179,8 +1254,8 @@ def _get_style_instruction(style: str, read_aloud: bool = False, output_dir: str
             "Section headers become spoken section titles. "
             "Run the text_to_speech tool with that spoken script, "
             f'output_dir="{output_dir}", output_filename="{audio_filename}". '
-            + embed_instruction +
-            f"After everything, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
+            + embed_instruction
+            + f"After everything, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
         )
 
     styles = {
@@ -1290,32 +1365,44 @@ def _get_style_instruction(style: str, read_aloud: bool = False, output_dir: str
 
 _last_notes_path = None
 
+
 def handle_take_notes(arguments: dict) -> dict:
     """Handle take_notes tool call - download, transcribe, save .txt to Desktop."""
     import os
     import re
+
     global _last_notes_path
 
     # --- Save mode: write formatted notes to the file from the previous call ---
     save_content = arguments.get("save_content")
     if save_content is not None:
         if not _last_notes_path:
-            raise ValueError("No previous take_notes path. Call take_notes with a url first.")
+            raise ValueError(
+                "No previous take_notes path. Call take_notes with a url first."
+            )
         # Post-process: convert plain A)/B)/C)/D) answer lines to checkbox syntax
-        had_bare = bool(re.search(r'^\s*[A-D]\)', save_content, flags=re.MULTILINE))
-        save_content = re.sub(r'^(\s*)([A-D]\))', r'- [ ] \2', save_content, flags=re.MULTILINE)
-        has_checkboxes = '- [ ]' in save_content
+        had_bare = bool(re.search(r"^\s*[A-D]\)", save_content, flags=re.MULTILINE))
+        save_content = re.sub(
+            r"^(\s*)([A-D]\))", r"- [ ] \2", save_content, flags=re.MULTILINE
+        )
+        has_checkboxes = "- [ ]" in save_content
         with open(_last_notes_path, "w", encoding="utf-8") as f:
             f.write(save_content)
         # Debug log
         import datetime
+
         with open(os.path.expanduser("~/.augent/checkbox_debug.log"), "a") as dbg:
-            dbg.write(f"{datetime.datetime.now()} | path={_last_notes_path} | had_bare={had_bare} | has_checkboxes={has_checkboxes} | size={len(save_content)}\n")
+            dbg.write(
+                f"{datetime.datetime.now()} | path={_last_notes_path} | had_bare={had_bare} | has_checkboxes={has_checkboxes} | size={len(save_content)}\n"
+            )
         return {
             "success": True,
             "saved_to": _last_notes_path,
             "size": len(save_content),
-            "debug_checkbox": {"had_bare_options": had_bare, "has_checkboxes_after": has_checkboxes},
+            "debug_checkbox": {
+                "had_bare_options": had_bare,
+                "has_checkboxes_after": has_checkboxes,
+            },
         }
 
     url = arguments.get("url")
@@ -1333,7 +1420,9 @@ def handle_take_notes(arguments: dict) -> dict:
     download_result = handle_download_audio({"url": url})
 
     if not download_result.get("success"):
-        raise RuntimeError("Download failed: " + download_result.get("message", "unknown error"))
+        raise RuntimeError(
+            "Download failed: " + download_result.get("message", "unknown error")
+        )
 
     file_info = download_result.get("file", {})
     if not file_info.get("path"):
@@ -1348,8 +1437,8 @@ def handle_take_notes(arguments: dict) -> dict:
 
     # Step 3: Save raw transcription as .txt on Desktop
     # Clean title for filename (remove special chars)
-    safe_title = re.sub(r'[^\w\s\-]', '', title)
-    safe_title = re.sub(r'\s+', ' ', safe_title).strip()
+    safe_title = re.sub(r"[^\w\s\-]", "", title)
+    safe_title = re.sub(r"\s+", " ", safe_title).strip()
     if not safe_title:
         safe_title = "notes"
     txt_filename = f"{safe_title}.txt"
@@ -1365,13 +1454,22 @@ def handle_take_notes(arguments: dict) -> dict:
     _last_notes_path = txt_path
 
     # Style-specific formatting instructions
-    instruction = _get_style_instruction(style, read_aloud=read_aloud, output_dir=output_dir, safe_title=safe_title, txt_path=txt_path)
+    instruction = _get_style_instruction(
+        style,
+        read_aloud=read_aloud,
+        output_dir=output_dir,
+        safe_title=safe_title,
+        txt_path=txt_path,
+    )
 
     # Cap transcription in response to prevent token overflow in Claude Code.
     # Full transcript is already saved to txt_path — Claude reads the file.
     max_chars = 12000
     if len(text) > max_chars:
-        truncated_text = text[:max_chars] + f"\n\n[... truncated — full transcript saved to {txt_path} — read the file for complete text ...]"
+        truncated_text = (
+            text[:max_chars]
+            + f"\n\n[... truncated — full transcript saved to {txt_path} — read the file for complete text ...]"
+        )
     else:
         truncated_text = text
 
@@ -1395,11 +1493,11 @@ def handle_identify_speakers(arguments: dict) -> dict:
     """Handle identify_speakers tool call."""
     try:
         from .speakers import identify_speakers
-    except ImportError:
+    except ImportError as err:
         raise RuntimeError(
             "Missing dependencies: simple-diarizer. "
             "Install with: pip install simple-diarizer"
-        )
+        ) from err
 
     audio_path = arguments.get("audio_path")
     model_size = arguments.get("model_size", "tiny")
@@ -1441,14 +1539,22 @@ def handle_search_memory(arguments: dict) -> dict:
     if mode == "semantic":
         try:
             from .embeddings import search_memory
-        except ImportError:
+        except ImportError as err:
             raise RuntimeError(
                 "Missing dependencies: sentence-transformers. "
                 "Install with: pip install sentence-transformers"
-            )
-        return search_memory(query, top_k=top_k, mode="semantic", output=output, context_words=context_words, dedup_seconds=dedup_seconds)
+            ) from err
+        return search_memory(
+            query,
+            top_k=top_k,
+            mode="semantic",
+            output=output,
+            context_words=context_words,
+            dedup_seconds=dedup_seconds,
+        )
     else:
         from .embeddings import search_memory
+
         return search_memory(query, top_k=top_k, mode="keyword", output=output)
 
 
@@ -1456,11 +1562,11 @@ def handle_deep_search(arguments: dict) -> dict:
     """Handle deep_search tool call."""
     try:
         from .embeddings import deep_search
-    except ImportError:
+    except ImportError as err:
         raise RuntimeError(
             "Missing dependencies: sentence-transformers. "
             "Install with: pip install sentence-transformers"
-        )
+        ) from err
 
     audio_path = arguments.get("audio_path")
     query = arguments.get("query")
@@ -1500,11 +1606,11 @@ def handle_chapters(arguments: dict) -> dict:
     """Handle chapters tool call."""
     try:
         from .embeddings import detect_chapters
-    except ImportError:
+    except ImportError as err:
         raise RuntimeError(
             "Missing dependencies: sentence-transformers. "
             "Install with: pip install sentence-transformers"
-        )
+        ) from err
 
     audio_path = arguments.get("audio_path")
     model_size = arguments.get("model_size", "tiny")
@@ -1531,12 +1637,13 @@ def handle_chapters(arguments: dict) -> dict:
 
 _tts_jobs = {}
 
+
 def handle_text_to_speech(arguments: dict) -> dict:
     """Handle text_to_speech tool call. Runs in background subprocess, returns instantly."""
-    import subprocess
-    import tempfile
     import os
     import shutil
+    import subprocess
+    import tempfile
     import uuid
 
     # Check status of a running job
@@ -1548,7 +1655,11 @@ def handle_text_to_speech(arguments: dict) -> dict:
         proc = job["proc"]
         poll = proc.poll()
         if poll is None:
-            return {"status": "generating", "job_id": job_id, "message": "TTS is still running. Check again in a few seconds."}
+            return {
+                "status": "generating",
+                "job_id": job_id,
+                "message": "TTS is still running. Check again in a few seconds.",
+            }
         # Done — read result
         stdout = proc.stdout.read()
         proc.stdout.close()
@@ -1607,7 +1718,7 @@ except Exception as e:
     print(json.dumps({{"error": str(e)}}))
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script)
         script_path = f.name
 
@@ -1626,7 +1737,7 @@ except Exception as e:
     return {
         "status": "started",
         "job_id": job_id,
-        "message": f"TTS generation started in background. Call text_to_speech with job_id='{job_id}' to check status."
+        "message": f"TTS generation started in background. Call text_to_speech with job_id='{job_id}' to check status.",
     }
 
 

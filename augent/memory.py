@@ -11,16 +11,17 @@ import os
 import re
 import sqlite3
 import threading
+import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass, asdict
-import time
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class MemorizedTranscription:
     """Stored transcription data."""
+
     audio_hash: str
     model_size: str
     language: str
@@ -131,9 +132,9 @@ class TranscriptionMemory:
         Uses SHA256 for reliable uniqueness.
         """
         hasher = hashlib.sha256()
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             # Read in chunks for memory efficiency with large files
-            for chunk in iter(lambda: f.read(8192), b''):
+            for chunk in iter(lambda: f.read(8192), b""):
                 hasher.update(chunk)
         return hasher.hexdigest()
 
@@ -153,19 +154,20 @@ class TranscriptionMemory:
     def _sanitize_filename(title: str) -> str:
         """Sanitize a title for use as a filename."""
         sanitized = "".join(
-            c if c.isalnum() or c in "-_ " else "_"
-            for c in title
+            c if c.isalnum() or c in "-_ " else "_" for c in title
         ).strip()
-        sanitized = re.sub(r'[_\s]+', '_', sanitized)
+        sanitized = re.sub(r"[_\s]+", "_", sanitized)
         return sanitized[:200] if sanitized else "untitled"
 
-    def _write_markdown(self, title: str, transcription: Dict[str, Any], file_path: str) -> Optional[Path]:
+    def _write_markdown(
+        self, title: str, transcription: Dict[str, Any], file_path: str
+    ) -> Optional[Path]:
         """Write a markdown transcription file. Returns the path or None on error."""
         try:
             sanitized = self._sanitize_filename(title)
             md_path = self.md_dir / f"{sanitized}.md"
 
-            duration = transcription.get('duration', 0)
+            duration = transcription.get("duration", 0)
             mins = int(duration // 60)
             secs = int(duration % 60)
 
@@ -182,20 +184,20 @@ class TranscriptionMemory:
                 "",
             ]
 
-            segments = transcription.get('segments', [])
+            segments = transcription.get("segments", [])
             for seg in segments:
-                start = seg.get('start', 0)
+                start = seg.get("start", 0)
                 m = int(start // 60)
                 s = int(start % 60)
-                text = seg.get('text', '').strip()
+                text = seg.get("text", "").strip()
                 lines.append(f"**[{m}:{s:02d}]** {text}")
                 lines.append("")
 
             if not segments:
-                lines.append(transcription.get('text', ''))
+                lines.append(transcription.get("text", ""))
                 lines.append("")
 
-            md_path.write_text("\n".join(lines), encoding='utf-8')
+            md_path.write_text("\n".join(lines), encoding="utf-8")
             return md_path
         except Exception:
             return None
@@ -219,8 +221,7 @@ class TranscriptionMemory:
                 with sqlite3.connect(self.db_path) as conn:
                     conn.row_factory = sqlite3.Row
                     cursor = conn.execute(
-                        "SELECT * FROM transcriptions WHERE cache_key = ?",
-                        (cache_key,)
+                        "SELECT * FROM transcriptions WHERE cache_key = ?", (cache_key,)
                     )
                     row = cursor.fetchone()
 
@@ -228,22 +229,24 @@ class TranscriptionMemory:
                         return None
 
                     return MemorizedTranscription(
-                        audio_hash=row['audio_hash'],
-                        model_size=row['model_size'],
-                        language=row['language'],
-                        duration=row['duration'],
-                        text=row['text'],
-                        words=json.loads(row['words']),
-                        segments=json.loads(row['segments']),
-                        created_at=row['created_at'],
-                        file_path=row['file_path'],
-                        title=row['title'] if 'title' in row.keys() else ''
+                        audio_hash=row["audio_hash"],
+                        model_size=row["model_size"],
+                        language=row["language"],
+                        duration=row["duration"],
+                        text=row["text"],
+                        words=json.loads(row["words"]),
+                        segments=json.loads(row["segments"]),
+                        created_at=row["created_at"],
+                        file_path=row["file_path"],
+                        title=row["title"] if "title" in row.keys() else "",
                     )
         except Exception:
             # Cache miss on any error
             return None
 
-    def set(self, file_path: str, model_size: str, transcription: Dict[str, Any]) -> None:
+    def set(
+        self, file_path: str, model_size: str, transcription: Dict[str, Any]
+    ) -> None:
         """
         Store transcription in memory.
 
@@ -262,25 +265,28 @@ class TranscriptionMemory:
 
             with self._lock:
                 with sqlite3.connect(self.db_path) as conn:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT OR REPLACE INTO transcriptions
                         (cache_key, audio_hash, model_size, language, duration,
                          text, words, segments, created_at, file_path, title, md_path)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        cache_key,
-                        audio_hash,
-                        model_size,
-                        transcription.get('language', 'unknown'),
-                        transcription.get('duration', 0),
-                        transcription.get('text', ''),
-                        json.dumps(transcription.get('words', [])),
-                        json.dumps(transcription.get('segments', [])),
-                        time.time(),
-                        file_path,
-                        title,
-                        str(md_path) if md_path else ''
-                    ))
+                    """,
+                        (
+                            cache_key,
+                            audio_hash,
+                            model_size,
+                            transcription.get("language", "unknown"),
+                            transcription.get("duration", 0),
+                            transcription.get("text", ""),
+                            json.dumps(transcription.get("words", [])),
+                            json.dumps(transcription.get("segments", [])),
+                            time.time(),
+                            file_path,
+                            title,
+                            str(md_path) if md_path else "",
+                        ),
+                    )
                     conn.commit()
         except Exception:
             # Silently fail on memory write errors
@@ -325,9 +331,7 @@ class TranscriptionMemory:
             cursor = conn.execute("SELECT COUNT(*) FROM transcriptions")
             count = cursor.fetchone()[0]
 
-            cursor = conn.execute(
-                "SELECT SUM(duration) FROM transcriptions"
-            )
+            cursor = conn.execute("SELECT SUM(duration) FROM transcriptions")
             total_duration = cursor.fetchone()[0] or 0
 
             # Get titles
@@ -336,19 +340,23 @@ class TranscriptionMemory:
             )
             titles = []
             for row in cursor.fetchall():
-                titles.append({
-                    "title": row[0] or "(untitled)",
-                    "model": row[1],
-                    "duration": row[2] or 0
-                })
+                titles.append(
+                    {
+                        "title": row[0] or "(untitled)",
+                        "model": row[1],
+                        "duration": row[2] or 0,
+                    }
+                )
 
             # Get DB file size
             db_size = self.db_path.stat().st_size if self.db_path.exists() else 0
 
             # Get md dir size
-            md_size = sum(
-                f.stat().st_size for f in self.md_dir.glob("*.md")
-            ) if self.md_dir.exists() else 0
+            md_size = (
+                sum(f.stat().st_size for f in self.md_dir.glob("*.md"))
+                if self.md_dir.exists()
+                else 0
+            )
 
             cursor = conn.execute("SELECT COUNT(*) FROM embeddings")
             embedding_count = cursor.fetchone()[0]
@@ -364,9 +372,8 @@ class TranscriptionMemory:
                 "memory_size_mb": round((db_size + md_size) / (1024 * 1024), 2),
                 "memory_path": str(self.db_path),
                 "md_dir": str(self.md_dir),
-                "titles": titles
+                "titles": titles,
             }
-
 
     def get_by_title(self, title: str) -> List[MemorizedTranscription]:
         """
@@ -385,21 +392,23 @@ class TranscriptionMemory:
                     conn.row_factory = sqlite3.Row
                     cursor = conn.execute(
                         "SELECT * FROM transcriptions WHERE title LIKE ?",
-                        (f"%{title}%",)
+                        (f"%{title}%",),
                     )
                     for row in cursor.fetchall():
-                        results.append(MemorizedTranscription(
-                            audio_hash=row['audio_hash'],
-                            model_size=row['model_size'],
-                            language=row['language'],
-                            duration=row['duration'],
-                            text=row['text'],
-                            words=json.loads(row['words']),
-                            segments=json.loads(row['segments']),
-                            created_at=row['created_at'],
-                            file_path=row['file_path'],
-                            title=row['title'] if 'title' in row.keys() else ''
-                        ))
+                        results.append(
+                            MemorizedTranscription(
+                                audio_hash=row["audio_hash"],
+                                model_size=row["model_size"],
+                                language=row["language"],
+                                duration=row["duration"],
+                                text=row["text"],
+                                words=json.loads(row["words"]),
+                                segments=json.loads(row["segments"]),
+                                created_at=row["created_at"],
+                                file_path=row["file_path"],
+                                title=row["title"] if "title" in row.keys() else "",
+                            )
+                        )
         except Exception:
             pass
         return results
@@ -420,22 +429,29 @@ class TranscriptionMemory:
                     "FROM transcriptions ORDER BY created_at DESC"
                 )
                 for row in cursor.fetchall():
-                    created = row['created_at']
-                    date_str = datetime.fromtimestamp(created).strftime('%Y-%m-%d %H:%M') if created else ''
+                    created = row["created_at"]
+                    date_str = (
+                        datetime.fromtimestamp(created).strftime("%Y-%m-%d %H:%M")
+                        if created
+                        else ""
+                    )
 
-                    duration = row['duration'] or 0
+                    duration = row["duration"] or 0
                     mins = int(duration // 60)
                     secs = int(duration % 60)
 
-                    entries.append({
-                        "title": row['title'] or os.path.basename(row['file_path'] or ''),
-                        "duration": duration,
-                        "duration_formatted": f"{mins}:{secs:02d}",
-                        "date": date_str,
-                        "model_size": row['model_size'],
-                        "md_path": row['md_path'] or '',
-                        "file_path": row['file_path'] or ''
-                    })
+                    entries.append(
+                        {
+                            "title": row["title"]
+                            or os.path.basename(row["file_path"] or ""),
+                            "duration": duration,
+                            "duration_formatted": f"{mins}:{secs:02d}",
+                            "date": date_str,
+                            "model_size": row["model_size"],
+                            "md_path": row["md_path"] or "",
+                            "file_path": row["file_path"] or "",
+                        }
+                    )
         except Exception:
             pass
         return entries
@@ -446,9 +462,12 @@ class TranscriptionMemory:
     def _embeddings_cache_key(audio_hash: str, embedding_model: str) -> str:
         return f"{audio_hash}:{embedding_model}"
 
-    def get_embeddings(self, audio_hash: str, embedding_model: str) -> Optional[Dict[str, Any]]:
+    def get_embeddings(
+        self, audio_hash: str, embedding_model: str
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve stored embeddings. Returns dict with numpy array or None."""
         import numpy as np
+
         cache_key = self._embeddings_cache_key(audio_hash, embedding_model)
         try:
             with self._lock:
@@ -462,29 +481,45 @@ class TranscriptionMemory:
                         return None
                     return {
                         "embeddings": np.frombuffer(
-                            row['embeddings'], dtype=np.float32
-                        ).reshape(row['segment_count'], row['embedding_dim']),
-                        "segment_count": row['segment_count'],
-                        "embedding_dim": row['embedding_dim'],
+                            row["embeddings"], dtype=np.float32
+                        ).reshape(row["segment_count"], row["embedding_dim"]),
+                        "segment_count": row["segment_count"],
+                        "embedding_dim": row["embedding_dim"],
                     }
         except Exception:
             return None
 
-    def set_embeddings(self, audio_hash: str, embedding_model: str,
-                       embeddings, segment_count: int, embedding_dim: int) -> None:
+    def set_embeddings(
+        self,
+        audio_hash: str,
+        embedding_model: str,
+        embeddings,
+        segment_count: int,
+        embedding_dim: int,
+    ) -> None:
         """Store embeddings in memory. embeddings should be a numpy ndarray."""
         cache_key = self._embeddings_cache_key(audio_hash, embedding_model)
-        blob = embeddings.astype('float32').tobytes()
+        blob = embeddings.astype("float32").tobytes()
         try:
             with self._lock:
                 with sqlite3.connect(self.db_path) as conn:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT OR REPLACE INTO embeddings
                         (cache_key, audio_hash, embedding_model, segment_count,
                          embedding_dim, embeddings, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (cache_key, audio_hash, embedding_model,
-                          segment_count, embedding_dim, blob, time.time()))
+                    """,
+                        (
+                            cache_key,
+                            audio_hash,
+                            embedding_model,
+                            segment_count,
+                            embedding_dim,
+                            blob,
+                            time.time(),
+                        ),
+                    )
                     conn.commit()
         except Exception:
             pass
@@ -511,18 +546,24 @@ class TranscriptionMemory:
                 """)
 
                 for row in cursor.fetchall():
-                    results.append({
-                        "audio_hash": row['audio_hash'],
-                        "title": row['title'] or '',
-                        "file_path": row['file_path'] or '',
-                        "duration": row['duration'] or 0,
-                        "segments": json.loads(row['segments']) if row['segments'] else [],
-                    })
+                    results.append(
+                        {
+                            "audio_hash": row["audio_hash"],
+                            "title": row["title"] or "",
+                            "file_path": row["file_path"] or "",
+                            "duration": row["duration"] or 0,
+                            "segments": (
+                                json.loads(row["segments"]) if row["segments"] else []
+                            ),
+                        }
+                    )
         except Exception:
             pass
         return results
 
-    def get_all_with_embeddings(self, embedding_model: str = "all-MiniLM-L6-v2") -> List[Dict[str, Any]]:
+    def get_all_with_embeddings(
+        self, embedding_model: str = "all-MiniLM-L6-v2"
+    ) -> List[Dict[str, Any]]:
         """
         Retrieve all transcriptions with their embeddings (if available).
 
@@ -541,7 +582,8 @@ class TranscriptionMemory:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT t.audio_hash, t.title, t.file_path, t.duration, t.segments,
                            e.embeddings AS emb_blob, e.segment_count, e.embedding_dim
                     FROM transcriptions t
@@ -549,27 +591,33 @@ class TranscriptionMemory:
                         ON t.audio_hash = e.audio_hash
                         AND e.embedding_model = ?
                     GROUP BY t.audio_hash
-                """, (embedding_model,))
+                """,
+                    (embedding_model,),
+                )
 
                 for row in cursor.fetchall():
                     emb = None
-                    seg_count = row['segment_count']
-                    emb_dim = row['embedding_dim']
-                    if row['emb_blob'] is not None and seg_count and emb_dim:
-                        emb = np.frombuffer(
-                            row['emb_blob'], dtype=np.float32
-                        ).reshape(seg_count, emb_dim)
+                    seg_count = row["segment_count"]
+                    emb_dim = row["embedding_dim"]
+                    if row["emb_blob"] is not None and seg_count and emb_dim:
+                        emb = np.frombuffer(row["emb_blob"], dtype=np.float32).reshape(
+                            seg_count, emb_dim
+                        )
 
-                    results.append({
-                        "audio_hash": row['audio_hash'],
-                        "title": row['title'] or '',
-                        "file_path": row['file_path'] or '',
-                        "duration": row['duration'] or 0,
-                        "segments": json.loads(row['segments']) if row['segments'] else [],
-                        "embeddings": emb,
-                        "segment_count": seg_count or 0,
-                        "embedding_dim": emb_dim or 0,
-                    })
+                    results.append(
+                        {
+                            "audio_hash": row["audio_hash"],
+                            "title": row["title"] or "",
+                            "file_path": row["file_path"] or "",
+                            "duration": row["duration"] or 0,
+                            "segments": (
+                                json.loads(row["segments"]) if row["segments"] else []
+                            ),
+                            "embeddings": emb,
+                            "segment_count": seg_count or 0,
+                            "embedding_dim": emb_dim or 0,
+                        }
+                    )
         except Exception:
             pass
         return results
@@ -580,7 +628,9 @@ class TranscriptionMemory:
     def _diarization_cache_key(audio_hash: str, num_speakers) -> str:
         return f"{audio_hash}:spk:{num_speakers}"
 
-    def get_diarization(self, audio_hash: str, num_speakers=None) -> Optional[Dict[str, Any]]:
+    def get_diarization(
+        self, audio_hash: str, num_speakers=None
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve stored diarization result."""
         cache_key = self._diarization_cache_key(audio_hash, num_speakers)
         try:
@@ -594,25 +644,35 @@ class TranscriptionMemory:
                     if row is None:
                         return None
                     return {
-                        "speakers": json.loads(row['speakers']),
-                        "turns": json.loads(row['turns']),
+                        "speakers": json.loads(row["speakers"]),
+                        "turns": json.loads(row["turns"]),
                     }
         except Exception:
             return None
 
-    def set_diarization(self, audio_hash: str, speakers: list, turns: list,
-                        num_speakers=None) -> None:
+    def set_diarization(
+        self, audio_hash: str, speakers: list, turns: list, num_speakers=None
+    ) -> None:
         """Store diarization result in memory."""
         cache_key = self._diarization_cache_key(audio_hash, num_speakers)
         try:
             with self._lock:
                 with sqlite3.connect(self.db_path) as conn:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT OR REPLACE INTO diarization
                         (cache_key, audio_hash, num_speakers, speakers, turns, created_at)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    """, (cache_key, audio_hash, num_speakers,
-                          json.dumps(speakers), json.dumps(turns), time.time()))
+                    """,
+                        (
+                            cache_key,
+                            audio_hash,
+                            num_speakers,
+                            json.dumps(speakers),
+                            json.dumps(turns),
+                            time.time(),
+                        ),
+                    )
                     conn.commit()
         except Exception:
             pass
@@ -659,15 +719,14 @@ class ModelCache:
                 # Determine compute type based on device if auto
                 if compute_type == "auto":
                     import torch
+
                     if torch.cuda.is_available():
                         compute_type = "float16"
                     else:
                         compute_type = "int8"
 
                 self._models[cache_key] = WhisperModel(
-                    model_size,
-                    device=device,
-                    compute_type=compute_type
+                    model_size, device=device, compute_type=compute_type
                 )
 
             return self._models[cache_key]

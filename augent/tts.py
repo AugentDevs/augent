@@ -62,9 +62,10 @@ def text_to_speech(
         )
 
     # Suppress all noisy warnings from torch/HF/kokoro
-    import logging
-    import io
     import contextlib
+    import io
+    import logging
+
     for logger_name in ("kokoro", "huggingface_hub", "torch", "transformers"):
         logging.getLogger(logger_name).setLevel(logging.ERROR)
     os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
@@ -73,9 +74,9 @@ def text_to_speech(
 
     with warnings.catch_warnings(), contextlib.redirect_stderr(io.StringIO()):
         warnings.simplefilter("ignore")
-        from kokoro import KPipeline
-        import soundfile as sf
         import numpy as np
+        import soundfile as sf
+        from kokoro import KPipeline
 
     # Detect language from voice prefix
     lang_code = voice[0] if voice else "a"
@@ -91,7 +92,9 @@ def text_to_speech(
                 chunks.append(audio)
 
     if not chunks:
-        raise RuntimeError("No audio generated. Check that the text and voice are valid.")
+        raise RuntimeError(
+            "No audio generated. Check that the text and voice are valid."
+        )
 
     # Concatenate all chunks
     full_audio = np.concatenate(chunks)
@@ -194,10 +197,19 @@ def _strip_markdown(text: str) -> str:
         if skip_metadata:
             if stripped.startswith("# "):
                 continue
-            if any(stripped.startswith(p) for p in (
-                "**Source:**", "Source:", "**Duration:**", "Duration:",
-                "**Date:**", "Date:", "**Channel:**", "Channel:",
-            )):
+            if any(
+                stripped.startswith(p)
+                for p in (
+                    "**Source:**",
+                    "Source:",
+                    "**Duration:**",
+                    "Duration:",
+                    "**Date:**",
+                    "Date:",
+                    "**Channel:**",
+                    "Channel:",
+                )
+            ):
                 continue
             if stripped == "---":
                 continue
@@ -233,7 +245,9 @@ def _strip_markdown(text: str) -> str:
         # Table rows — extract cell contents, skip timestamp-only cells
         if stripped.startswith("|") and stripped.endswith("|"):
             cells = [c.strip() for c in stripped.split("|")[1:-1]]
-            cells = [c for c in cells if c and not re.match(r"^\d{1,2}:\d{2}(?::\d{2})?$", c)]
+            cells = [
+                c for c in cells if c and not re.match(r"^\d{1,2}:\d{2}(?::\d{2})?$", c)
+            ]
             if cells:
                 cleaned.append(". ".join(cells))
             continue
@@ -245,7 +259,9 @@ def _strip_markdown(text: str) -> str:
         stripped = re.sub(r"^>\s*", "", stripped)
 
         # Strip headers with timestamp prefix: "## 5:00 — The Miami Side Quest" -> "The Miami Side Quest"
-        stripped = re.sub(r"^#{1,6}\s+\d{1,2}:\d{2}(?::\d{2})?\s*[—–\-]\s*", "", stripped)
+        stripped = re.sub(
+            r"^#{1,6}\s+\d{1,2}:\d{2}(?::\d{2})?\s*[—–\-]\s*", "", stripped
+        )
 
         # Strip headers (keep text)
         stripped = re.sub(r"^#{1,6}\s+", "", stripped)
@@ -276,7 +292,11 @@ def _strip_markdown(text: str) -> str:
         stripped = re.sub(r"\b\d{1,2}:\d{2}(?::\d{2})?\b", "", stripped)
 
         # Strip emoji and decorative unicode
-        stripped = re.sub(r"[\U0001F300-\U0001FFFF\u2600-\u27FF\u2300-\u23FF\u2B50\u2728\u2734\u2735\u2716\u2714\u2764\u00A9\u00AE\u2122\u25A0-\u25FF]+", "", stripped)
+        stripped = re.sub(
+            r"[\U0001F300-\U0001FFFF\u2600-\u27FF\u2300-\u23FF\u2B50\u2728\u2734\u2735\u2716\u2714\u2764\u00A9\u00AE\u2122\u25A0-\u25FF]+",
+            "",
+            stripped,
+        )
         stripped = re.sub(r"[✦✧★☆●○◆◇▶►▷▸◂◄◁◀]+", "", stripped)
 
         # Clean up residual artifacts: trailing/leading em dashes, double spaces
@@ -337,14 +357,15 @@ def read_aloud(
     )
 
     # Embed in file if Obsidian is installed
-    obsidian_installed = (
-        os.path.exists("/Applications/Obsidian.app")
-        or bool(shutil.which("obsidian"))
+    obsidian_installed = os.path.exists("/Applications/Obsidian.app") or bool(
+        shutil.which("obsidian")
     )
 
     if obsidian_installed:
         embed_line = f"![[{audio_filename}]]"
-        tip_line = "> Press Cmd+E before playing \u2014 prevents audio from pausing on scroll"
+        tip_line = (
+            "> Press Cmd+E before playing \u2014 prevents audio from pausing on scroll"
+        )
 
         # Copy MP3 into Obsidian vault so the embed can find it
         vault_path = _find_obsidian_vault()

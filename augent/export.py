@@ -10,11 +10,10 @@ Supports:
 """
 
 import csv
-import json
 import io
+import json
 import re
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 
 def format_srt_timestamp(seconds: float) -> str:
@@ -47,8 +46,7 @@ class Exporter:
 
     @staticmethod
     def to_srt(
-        segments: List[Dict],
-        highlight_keywords: Optional[List[str]] = None
+        segments: List[Dict], highlight_keywords: Optional[List[str]] = None
     ) -> str:
         """
         Export transcription segments to SRT subtitle format.
@@ -63,9 +61,9 @@ class Exporter:
         lines = []
 
         for i, segment in enumerate(segments, 1):
-            start = format_srt_timestamp(segment['start'])
-            end = format_srt_timestamp(segment['end'])
-            text = segment['text'].strip()
+            start = format_srt_timestamp(segment["start"])
+            end = format_srt_timestamp(segment["end"])
+            text = segment["text"].strip()
 
             # Highlight keywords if specified
             if highlight_keywords:
@@ -83,8 +81,7 @@ class Exporter:
 
     @staticmethod
     def to_vtt(
-        segments: List[Dict],
-        highlight_keywords: Optional[List[str]] = None
+        segments: List[Dict], highlight_keywords: Optional[List[str]] = None
     ) -> str:
         """
         Export transcription segments to WebVTT format.
@@ -99,9 +96,9 @@ class Exporter:
         lines = ["WEBVTT", ""]
 
         for i, segment in enumerate(segments, 1):
-            start = format_vtt_timestamp(segment['start'])
-            end = format_vtt_timestamp(segment['end'])
-            text = segment['text'].strip()
+            start = format_vtt_timestamp(segment["start"])
+            end = format_vtt_timestamp(segment["end"])
+            text = segment["text"].strip()
 
             # Highlight keywords if specified
             if highlight_keywords:
@@ -133,14 +130,14 @@ class Exporter:
         lines = []
 
         for i, match in enumerate(matches, 1):
-            start_sec = match.get('timestamp_seconds', 0)
+            start_sec = match.get("timestamp_seconds", 0)
             end_sec = start_sec + duration
 
             start = format_srt_timestamp(start_sec)
             end = format_srt_timestamp(end_sec)
 
-            keyword = match.get('keyword', '')
-            snippet = match.get('snippet', '').replace('...', '').strip()
+            keyword = match.get("keyword", "")
+            snippet = match.get("snippet", "").replace("...", "").strip()
 
             lines.append(f"{i}")
             lines.append(f"{start} --> {end}")
@@ -164,14 +161,14 @@ class Exporter:
         lines = ["WEBVTT", ""]
 
         for i, match in enumerate(matches, 1):
-            start_sec = match.get('timestamp_seconds', 0)
+            start_sec = match.get("timestamp_seconds", 0)
             end_sec = start_sec + duration
 
             start = format_vtt_timestamp(start_sec)
             end = format_vtt_timestamp(end_sec)
 
-            keyword = match.get('keyword', '')
-            snippet = match.get('snippet', '').replace('...', '').strip()
+            keyword = match.get("keyword", "")
+            snippet = match.get("snippet", "").replace("...", "").strip()
 
             lines.append(f"{i}")
             lines.append(f"{start} --> {end}")
@@ -195,25 +192,29 @@ class Exporter:
         writer = csv.writer(output)
 
         # Header
-        writer.writerow([
-            'keyword',
-            'timestamp',
-            'timestamp_seconds',
-            'snippet',
-            'confidence',
-            'match_type'
-        ])
+        writer.writerow(
+            [
+                "keyword",
+                "timestamp",
+                "timestamp_seconds",
+                "snippet",
+                "confidence",
+                "match_type",
+            ]
+        )
 
         # Data rows
         for match in matches:
-            writer.writerow([
-                match.get('keyword', ''),
-                match.get('timestamp', ''),
-                match.get('timestamp_seconds', 0),
-                match.get('snippet', '').replace('...', '').strip(),
-                match.get('confidence', 1.0),
-                match.get('match_type', 'exact')
-            ])
+            writer.writerow(
+                [
+                    match.get("keyword", ""),
+                    match.get("timestamp", ""),
+                    match.get("timestamp_seconds", 0),
+                    match.get("snippet", "").replace("...", "").strip(),
+                    match.get("confidence", 1.0),
+                    match.get("match_type", "exact"),
+                ]
+            )
 
         return output.getvalue()
 
@@ -222,7 +223,7 @@ class Exporter:
         matches: List[Dict],
         audio_file: str = "",
         transcription_text: str = "",
-        include_full_text: bool = False
+        include_full_text: bool = False,
     ) -> str:
         """
         Export matches to a human-readable Markdown report.
@@ -247,7 +248,7 @@ class Exporter:
             lines.append("")
 
         # Summary
-        keywords = list(set(m.get('keyword', '') for m in matches))
+        keywords = list({m.get("keyword", "") for m in matches})
         lines.append(f"**Keywords searched:** {', '.join(keywords)}")
         lines.append(f"**Total matches:** {len(matches)}")
         lines.append("")
@@ -259,7 +260,7 @@ class Exporter:
         # Group by keyword
         by_keyword: Dict[str, List[Dict]] = {}
         for match in matches:
-            kw = match.get('keyword', 'unknown')
+            kw = match.get("keyword", "unknown")
             if kw not in by_keyword:
                 by_keyword[kw] = []
             by_keyword[kw].append(match)
@@ -271,9 +272,9 @@ class Exporter:
             lines.append("|-----------|---------|------|")
 
             for match in kw_matches:
-                ts = match.get('timestamp', '')
-                snippet = match.get('snippet', '').replace('...', '').strip()
-                match_type = match.get('match_type', 'exact')
+                ts = match.get("timestamp", "")
+                snippet = match.get("snippet", "").replace("...", "").strip()
+                match_type = match.get("match_type", "exact")
                 lines.append(f"| {ts} | {snippet} | {match_type} |")
 
             lines.append("")
@@ -292,7 +293,7 @@ class Exporter:
         matches: List[Dict],
         grouped: bool = True,
         include_metadata: bool = False,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
     ) -> str:
         """
         Export matches to JSON format.
@@ -310,39 +311,31 @@ class Exporter:
             # Group by keyword
             result: Dict[str, List[Dict]] = {}
             for match in matches:
-                kw = match.get('keyword', 'unknown')
+                kw = match.get("keyword", "unknown")
                 if kw not in result:
                     result[kw] = []
-                result[kw].append({
-                    'timestamp': match.get('timestamp', ''),
-                    'timestamp_seconds': match.get('timestamp_seconds', 0),
-                    'snippet': match.get('snippet', ''),
-                    'confidence': match.get('confidence', 1.0),
-                    'match_type': match.get('match_type', 'exact')
-                })
+                result[kw].append(
+                    {
+                        "timestamp": match.get("timestamp", ""),
+                        "timestamp_seconds": match.get("timestamp_seconds", 0),
+                        "snippet": match.get("snippet", ""),
+                        "confidence": match.get("confidence", 1.0),
+                        "match_type": match.get("match_type", "exact"),
+                    }
+                )
 
             if include_metadata and metadata:
-                return json.dumps({
-                    'metadata': metadata,
-                    'matches': result
-                }, indent=2)
+                return json.dumps({"metadata": metadata, "matches": result}, indent=2)
 
             return json.dumps(result, indent=2)
         else:
             if include_metadata and metadata:
-                return json.dumps({
-                    'metadata': metadata,
-                    'matches': matches
-                }, indent=2)
+                return json.dumps({"metadata": metadata, "matches": matches}, indent=2)
 
             return json.dumps(matches, indent=2)
 
 
-def export_matches(
-    matches: List[Dict],
-    format: str = "json",
-    **kwargs
-) -> str:
+def export_matches(matches: List[Dict], format: str = "json", **kwargs) -> str:
     """
     Export matches to the specified format.
 
@@ -368,14 +361,12 @@ def export_matches(
     elif format in ("markdown", "md"):
         return exporter.to_markdown(matches, **kwargs)
     else:
-        raise ValueError(f"Unknown format: {format}. Use json, csv, srt, vtt, or markdown.")
+        raise ValueError(
+            f"Unknown format: {format}. Use json, csv, srt, vtt, or markdown."
+        )
 
 
-def export_transcription(
-    segments: List[Dict],
-    format: str = "srt",
-    **kwargs
-) -> str:
+def export_transcription(segments: List[Dict], format: str = "srt", **kwargs) -> str:
     """
     Export full transcription to subtitle format.
 

@@ -15,22 +15,22 @@ from unittest import mock
 import pytest
 
 from augent.mcp import (
-    send_response,
-    send_error,
-    handle_initialize,
-    handle_tools_list,
-    handle_tools_call,
-    handle_request,
-    handle_list_files,
-    handle_memory_stats,
-    handle_clear_memory,
-    handle_list_memories,
-    handle_search_memory,
     _get_style_instruction,
+    handle_clear_memory,
+    handle_initialize,
+    handle_list_files,
+    handle_list_memories,
+    handle_memory_stats,
+    handle_request,
+    handle_search_memory,
+    handle_tools_call,
+    handle_tools_list,
+    send_error,
+    send_response,
 )
 
-
 # --- Helpers ---
+
 
 def capture_stdout(func, *args, **kwargs):
     """Call func and return the parsed JSON written to stdout."""
@@ -41,6 +41,7 @@ def capture_stdout(func, *args, **kwargs):
 
 
 # --- JSON-RPC response formatting ---
+
 
 class TestSendResponse:
     def test_sends_valid_json(self):
@@ -56,6 +57,7 @@ class TestSendResponse:
 
 # --- Initialize ---
 
+
 class TestInitialize:
     def test_returns_protocol_version(self):
         resp = capture_stdout(handle_initialize, 1, {})
@@ -70,6 +72,7 @@ class TestInitialize:
 
 
 # --- Tools list ---
+
 
 class TestToolsList:
     def test_returns_15_tools(self):
@@ -89,10 +92,20 @@ class TestToolsList:
         resp = capture_stdout(handle_tools_list, 1)
         names = {t["name"] for t in resp["result"]["tools"]}
         expected = {
-            "download_audio", "transcribe_audio", "search_audio",
-            "deep_search", "take_notes", "chapters", "batch_search",
-            "text_to_speech", "search_proximity", "identify_speakers",
-            "list_files", "list_memories", "memory_stats", "clear_memory",
+            "download_audio",
+            "transcribe_audio",
+            "search_audio",
+            "deep_search",
+            "take_notes",
+            "chapters",
+            "batch_search",
+            "text_to_speech",
+            "search_proximity",
+            "identify_speakers",
+            "list_files",
+            "list_memories",
+            "memory_stats",
+            "clear_memory",
             "search_memory",
         }
         assert names == expected
@@ -100,23 +113,25 @@ class TestToolsList:
 
 # --- Request routing ---
 
+
 class TestRequestRouting:
     def test_initialize_routes(self):
-        resp = capture_stdout(handle_request, {
-            "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}
-        })
+        resp = capture_stdout(
+            handle_request,
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        )
         assert "result" in resp
 
     def test_tools_list_routes(self):
-        resp = capture_stdout(handle_request, {
-            "jsonrpc": "2.0", "id": 2, "method": "tools/list"
-        })
+        resp = capture_stdout(
+            handle_request, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
+        )
         assert "tools" in resp["result"]
 
     def test_unknown_method_returns_error(self):
-        resp = capture_stdout(handle_request, {
-            "jsonrpc": "2.0", "id": 3, "method": "nonexistent/method"
-        })
+        resp = capture_stdout(
+            handle_request, {"jsonrpc": "2.0", "id": 3, "method": "nonexistent/method"}
+        )
         assert resp["error"]["code"] == -32601
 
     def test_notification_no_response(self):
@@ -127,13 +142,14 @@ class TestRequestRouting:
         assert buf.getvalue() == ""
 
     def test_unknown_tool_returns_error(self):
-        resp = capture_stdout(handle_tools_call, 1, {
-            "name": "nonexistent_tool", "arguments": {}
-        })
+        resp = capture_stdout(
+            handle_tools_call, 1, {"name": "nonexistent_tool", "arguments": {}}
+        )
         assert resp["error"]["code"] == -32602
 
 
 # --- list_files handler ---
+
 
 class TestListFiles:
     def test_lists_audio_files(self):
@@ -189,9 +205,10 @@ class TestListFiles:
 
 # --- Memory handlers ---
 
+
 class TestMemoryHandlers:
     def test_memory_stats_returns_dict(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory():
             with mock.patch("augent.mcp.get_memory_stats") as mock_stats:
                 mock_stats.return_value = {
                     "entries": 0,
@@ -220,8 +237,11 @@ class TestMemoryHandlers:
 
 # --- Style instructions ---
 
+
 class TestStyleInstructions:
-    @pytest.mark.parametrize("style", ["tldr", "notes", "highlight", "eye-candy", "quiz"])
+    @pytest.mark.parametrize(
+        "style", ["tldr", "notes", "highlight", "eye-candy", "quiz"]
+    )
     def test_all_styles_return_instructions(self, style):
         instruction = _get_style_instruction(style)
         assert isinstance(instruction, str)
@@ -243,40 +263,50 @@ class TestStyleInstructions:
 
 # --- Tool call error handling ---
 
+
 class TestToolCallErrors:
     def test_missing_audio_path_search(self):
-        resp = capture_stdout(handle_tools_call, 1, {
-            "name": "search_audio", "arguments": {"keywords": ["test"]}
-        })
+        resp = capture_stdout(
+            handle_tools_call,
+            1,
+            {"name": "search_audio", "arguments": {"keywords": ["test"]}},
+        )
         assert resp["error"]["code"] == -32602
 
     def test_missing_keywords_search(self):
-        resp = capture_stdout(handle_tools_call, 1, {
-            "name": "search_audio", "arguments": {"audio_path": "/fake.mp3"}
-        })
+        resp = capture_stdout(
+            handle_tools_call,
+            1,
+            {"name": "search_audio", "arguments": {"audio_path": "/fake.mp3"}},
+        )
         assert resp["error"]["code"] == -32602
 
     def test_missing_url_take_notes(self):
-        resp = capture_stdout(handle_tools_call, 1, {
-            "name": "take_notes", "arguments": {}
-        })
+        resp = capture_stdout(
+            handle_tools_call, 1, {"name": "take_notes", "arguments": {}}
+        )
         assert resp["error"]["code"] == -32602
 
     def test_missing_query_search_memory(self):
-        resp = capture_stdout(handle_tools_call, 1, {
-            "name": "search_memory", "arguments": {}
-        })
+        resp = capture_stdout(
+            handle_tools_call, 1, {"name": "search_memory", "arguments": {}}
+        )
         assert resp["error"]["code"] == -32602
 
     def test_missing_audio_path_proximity(self):
-        resp = capture_stdout(handle_tools_call, 1, {
-            "name": "search_proximity",
-            "arguments": {"keyword1": "a", "keyword2": "b"}
-        })
+        resp = capture_stdout(
+            handle_tools_call,
+            1,
+            {
+                "name": "search_proximity",
+                "arguments": {"keyword1": "a", "keyword2": "b"},
+            },
+        )
         assert resp["error"]["code"] == -32602
 
 
 # --- search_memory ---
+
 
 class TestSearchMemory:
     def test_missing_query_raises(self):
@@ -292,43 +322,98 @@ class TestSearchMemory:
         assert "query" in schema["inputSchema"]["properties"]
         assert "query" in schema["inputSchema"]["required"]
         assert "mode" in schema["inputSchema"]["properties"]
-        assert schema["inputSchema"]["properties"]["mode"]["enum"] == ["keyword", "semantic"]
+        assert schema["inputSchema"]["properties"]["mode"]["enum"] == [
+            "keyword",
+            "semantic",
+        ]
         assert "output" in schema["inputSchema"]["properties"]
 
     def test_routes_correctly(self):
         with mock.patch("augent.mcp.handle_search_memory") as mock_handler:
-            mock_handler.return_value = {"query": "test", "mode": "keyword", "results": [], "match_count": 0, "total_segments": 0, "files_searched": 0}
-            resp = capture_stdout(handle_tools_call, 1, {
-                "name": "search_memory", "arguments": {"query": "test"}
-            })
+            mock_handler.return_value = {
+                "query": "test",
+                "mode": "keyword",
+                "results": [],
+                "match_count": 0,
+                "total_segments": 0,
+                "files_searched": 0,
+            }
+            resp = capture_stdout(
+                handle_tools_call,
+                1,
+                {"name": "search_memory", "arguments": {"query": "test"}},
+            )
             mock_handler.assert_called_once_with({"query": "test"})
             assert "result" in resp
 
     def test_defaults_to_keyword_mode(self):
         with mock.patch("augent.embeddings.search_memory") as mock_fn:
-            mock_fn.return_value = {"query": "dog", "mode": "keyword", "results": [], "match_count": 0, "total_segments": 0, "files_searched": 0}
+            mock_fn.return_value = {
+                "query": "dog",
+                "mode": "keyword",
+                "results": [],
+                "match_count": 0,
+                "total_segments": 0,
+                "files_searched": 0,
+            }
             handle_search_memory({"query": "dog"})
-            mock_fn.assert_called_once_with("dog", top_k=10, mode="keyword", output=None)
+            mock_fn.assert_called_once_with(
+                "dog", top_k=10, mode="keyword", output=None
+            )
 
     def test_semantic_mode_passed(self):
         with mock.patch("augent.embeddings.search_memory") as mock_fn:
-            mock_fn.return_value = {"query": "test", "mode": "semantic", "results": [], "total_segments": 0, "files_searched": 0, "model_used": "all-MiniLM-L6-v2"}
+            mock_fn.return_value = {
+                "query": "test",
+                "mode": "semantic",
+                "results": [],
+                "total_segments": 0,
+                "files_searched": 0,
+                "model_used": "all-MiniLM-L6-v2",
+            }
             handle_search_memory({"query": "test", "mode": "semantic"})
-            mock_fn.assert_called_once_with("test", top_k=10, mode="semantic", output=None, context_words=25, dedup_seconds=0)
+            mock_fn.assert_called_once_with(
+                "test",
+                top_k=10,
+                mode="semantic",
+                output=None,
+                context_words=25,
+                dedup_seconds=0,
+            )
 
     def test_output_param_passed(self):
         with mock.patch("augent.embeddings.search_memory") as mock_fn:
-            mock_fn.return_value = {"query": "test", "mode": "keyword", "results": [], "match_count": 0, "total_segments": 0, "files_searched": 0}
+            mock_fn.return_value = {
+                "query": "test",
+                "mode": "keyword",
+                "results": [],
+                "match_count": 0,
+                "total_segments": 0,
+                "files_searched": 0,
+            }
             handle_search_memory({"query": "test", "output": "~/Desktop/results.csv"})
-            mock_fn.assert_called_once_with("test", top_k=10, mode="keyword", output="~/Desktop/results.csv")
+            mock_fn.assert_called_once_with(
+                "test", top_k=10, mode="keyword", output="~/Desktop/results.csv"
+            )
 
 
 class TestWriteResultsCsv:
     def test_writes_csv_with_title_column(self):
         from augent.embeddings import _write_results_csv
+
         results = [
-            {"title": "Episode 1", "timestamp": "1:30", "text": "...hello **world**...", "start": 90},
-            {"title": "Episode 2", "timestamp": "5:00", "text": "...foo bar...", "start": 300},
+            {
+                "title": "Episode 1",
+                "timestamp": "1:30",
+                "text": "...hello **world**...",
+                "start": 90,
+            },
+            {
+                "title": "Episode 2",
+                "timestamp": "5:00",
+                "text": "...foo bar...",
+                "start": 300,
+            },
         ]
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "out.csv")
@@ -343,6 +428,7 @@ class TestWriteResultsCsv:
 
     def test_writes_csv_with_similarity(self):
         from augent.embeddings import _write_results_csv
+
         results = [
             {"title": "Ep1", "timestamp": "0:10", "text": "test", "similarity": 0.85},
         ]
@@ -359,5 +445,6 @@ class TestWriteResultsCsv:
         with mock.patch("augent.embeddings.get_transcription_memory") as mock_mem:
             mock_mem.return_value.get_all_with_segments.return_value = []
             from augent.embeddings import search_memory
+
             result = search_memory("test", output="/tmp/should_not_exist.csv")
             assert "csv_path" not in result

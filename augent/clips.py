@@ -9,16 +9,17 @@ Provides functionality to:
 """
 
 import os
-import subprocess
 import shutil
-from pathlib import Path
-from typing import Callable, List, Dict, Optional, Generator
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Dict, Generator, List, Optional
 
 
 @dataclass
 class ClipInfo:
     """Information about an exported clip."""
+
     output_path: str
     keyword: str
     timestamp: str
@@ -37,7 +38,7 @@ def extract_clip_ffmpeg(
     output_path: str,
     start_seconds: float,
     end_seconds: float,
-    format: str = "mp3"
+    format: str = "mp3",
 ) -> bool:
     """
     Extract an audio clip using ffmpeg.
@@ -57,21 +58,21 @@ def extract_clip_ffmpeg(
     cmd = [
         "ffmpeg",
         "-y",  # Overwrite output
-        "-i", audio_path,
-        "-ss", str(start_seconds),
-        "-t", str(duration),
-        "-acodec", "libmp3lame" if format == "mp3" else "copy",
-        "-q:a", "2",  # Quality setting for mp3
-        output_path
+        "-i",
+        audio_path,
+        "-ss",
+        str(start_seconds),
+        "-t",
+        str(duration),
+        "-acodec",
+        "libmp3lame" if format == "mp3" else "copy",
+        "-q:a",
+        "2",  # Quality setting for mp3
+        output_path,
     ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         return result.returncode == 0
     except Exception:
         return False
@@ -82,7 +83,7 @@ def extract_clip_pydub(
     output_path: str,
     start_seconds: float,
     end_seconds: float,
-    format: str = "mp3"
+    format: str = "mp3",
 ) -> bool:
     """
     Extract an audio clip using pydub (fallback if ffmpeg not available directly).
@@ -119,10 +120,7 @@ def extract_clip_pydub(
 
 
 def format_filename(
-    keyword: str,
-    timestamp_seconds: float,
-    index: int,
-    format: str = "mp3"
+    keyword: str, timestamp_seconds: float, index: int, format: str = "mp3"
 ) -> str:
     """
     Generate a clean filename for a clip.
@@ -137,10 +135,11 @@ def format_filename(
         Formatted filename
     """
     # Clean keyword for filename
-    clean_keyword = "".join(
-        c if c.isalnum() or c in "-_ " else "_"
-        for c in keyword
-    ).strip().replace(" ", "_")[:30]
+    clean_keyword = (
+        "".join(c if c.isalnum() or c in "-_ " else "_" for c in keyword)
+        .strip()
+        .replace(" ", "_")[:30]
+    )
 
     # Format timestamp
     mins = int(timestamp_seconds // 60)
@@ -158,7 +157,7 @@ class ClipExtractor:
         padding_before: float = 5.0,
         padding_after: float = 5.0,
         output_format: str = "mp3",
-        use_pydub: bool = False
+        use_pydub: bool = False,
     ):
         """
         Initialize the clip extractor.
@@ -179,19 +178,20 @@ class ClipExtractor:
         if not self.has_ffmpeg and not use_pydub:
             try:
                 import pydub
+
                 self.use_pydub = True
-            except ImportError:
+            except ImportError as err:
                 raise RuntimeError(
                     "Neither ffmpeg nor pydub is available. "
                     "Install ffmpeg or run: pip install pydub"
-                )
+                ) from err
 
     def extract_clip(
         self,
         audio_path: str,
         output_path: str,
         timestamp_seconds: float,
-        duration: Optional[float] = None
+        duration: Optional[float] = None,
     ) -> bool:
         """
         Extract a single clip around a timestamp.
@@ -227,7 +227,7 @@ class ClipExtractor:
         audio_path: str,
         matches: List[Dict],
         output_dir: str,
-        on_progress: Optional[Callable] = None
+        on_progress: Optional[Callable] = None,
     ) -> Generator[ClipInfo, None, None]:
         """
         Extract clips for all keyword matches.
@@ -248,8 +248,8 @@ class ClipExtractor:
         total = len(matches)
 
         for i, match in enumerate(matches):
-            keyword = match.get('keyword', 'unknown')
-            timestamp_seconds = match.get('timestamp_seconds', 0)
+            keyword = match.get("keyword", "unknown")
+            timestamp_seconds = match.get("timestamp_seconds", 0)
 
             # Generate filename
             filename = format_filename(
@@ -262,18 +262,16 @@ class ClipExtractor:
             end = timestamp_seconds + self.padding_after
 
             # Extract
-            success = self.extract_clip(
-                audio_path, clip_path, timestamp_seconds
-            )
+            success = self.extract_clip(audio_path, clip_path, timestamp_seconds)
 
             if success:
                 info = ClipInfo(
                     output_path=clip_path,
                     keyword=keyword,
-                    timestamp=match.get('timestamp', ''),
+                    timestamp=match.get("timestamp", ""),
                     start_seconds=start,
                     end_seconds=end,
-                    duration=end - start
+                    duration=end - start,
                 )
 
                 if on_progress:
@@ -286,7 +284,7 @@ class ClipExtractor:
         audio_path: str,
         matches: List[Dict],
         output_dir: str,
-        on_progress: Optional[Callable] = None
+        on_progress: Optional[Callable] = None,
     ) -> List[ClipInfo]:
         """
         Extract all clips and return as a list.
@@ -300,9 +298,7 @@ class ClipExtractor:
         Returns:
             List of ClipInfo for successfully extracted clips
         """
-        return list(self.extract_matches(
-            audio_path, matches, output_dir, on_progress
-        ))
+        return list(self.extract_matches(audio_path, matches, output_dir, on_progress))
 
 
 def export_clips(
@@ -311,7 +307,7 @@ def export_clips(
     output_dir: str,
     padding: float = 5.0,
     format: str = "mp3",
-    on_progress: Optional[Callable] = None
+    on_progress: Optional[Callable] = None,
 ) -> List[Dict]:
     """
     Convenience function to export clips for all matches.
@@ -328,32 +324,26 @@ def export_clips(
         List of dicts with clip information
     """
     extractor = ClipExtractor(
-        padding_before=padding,
-        padding_after=padding,
-        output_format=format
+        padding_before=padding, padding_after=padding, output_format=format
     )
 
-    clips = extractor.extract_all(
-        audio_path, matches, output_dir, on_progress
-    )
+    clips = extractor.extract_all(audio_path, matches, output_dir, on_progress)
 
     return [
         {
-            'output_path': c.output_path,
-            'keyword': c.keyword,
-            'timestamp': c.timestamp,
-            'start_seconds': c.start_seconds,
-            'end_seconds': c.end_seconds,
-            'duration': c.duration
+            "output_path": c.output_path,
+            "keyword": c.keyword,
+            "timestamp": c.timestamp,
+            "start_seconds": c.start_seconds,
+            "end_seconds": c.end_seconds,
+            "duration": c.duration,
         }
         for c in clips
     ]
 
 
 def merge_clips(
-    clip_paths: List[str],
-    output_path: str,
-    gap_seconds: float = 0.5
+    clip_paths: List[str], output_path: str, gap_seconds: float = 0.5
 ) -> bool:
     """
     Merge multiple clips into a single compilation.
@@ -374,7 +364,8 @@ def merge_clips(
 
     # Create a file list for ffmpeg concat
     import tempfile
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         for path in clip_paths:
             f.write(f"file '{path}'\n")
         list_file = f.name
@@ -383,12 +374,17 @@ def merge_clips(
         cmd = [
             "ffmpeg",
             "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", list_file,
-            "-acodec", "libmp3lame",
-            "-q:a", "2",
-            output_path
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            list_file,
+            "-acodec",
+            "libmp3lame",
+            "-q:a",
+            "2",
+            output_path,
         ]
 
         result = subprocess.run(cmd, capture_output=True, timeout=300)

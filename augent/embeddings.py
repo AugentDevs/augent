@@ -10,11 +10,12 @@ import csv
 import io
 import os
 import threading
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from typing import Dict, Any, Optional, List
 
 from .core import transcribe_audio
-from .memory import get_transcription_memory, TranscriptionMemory
+from .memory import get_transcription_memory
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
@@ -39,6 +40,7 @@ class EmbeddingModelCache:
         with self._model_lock:
             if model_name not in self._models:
                 from sentence_transformers import SentenceTransformer
+
                 self._models[model_name] = SentenceTransformer(model_name)
             return self._models[model_name]
 
@@ -63,16 +65,21 @@ def _cosine_similarity(query: np.ndarray, embeddings: np.ndarray) -> np.ndarray:
 def _highlight_keywords(text: str, keywords: List[str]) -> str:
     """Wrap keyword occurrences in **bold** markers for terminal display."""
     import re
+
     for kw in keywords:
         if not kw or not kw.strip():
             continue
-        pattern = re.compile(r'(' + re.escape(kw) + r')', re.IGNORECASE)
-        text = pattern.sub(r'**\1**', text)
+        pattern = re.compile(r"(" + re.escape(kw) + r")", re.IGNORECASE)
+        text = pattern.sub(r"**\1**", text)
     return text
 
 
-def _build_snippet(segments: list, center_idx: int, target_words: int = 25,
-                   highlight: Optional[List[str]] = None) -> str:
+def _build_snippet(
+    segments: list,
+    center_idx: int,
+    target_words: int = 25,
+    highlight: Optional[List[str]] = None,
+) -> str:
     """Build a ~target_words snippet by expanding from center segment into neighbors."""
     words = segments[center_idx].get("text", "").strip().split()
 
@@ -125,10 +132,16 @@ def _ranked_semantic_search(
     Each entry in segments_meta must have: seg, seg_idx, file_segments.
     Optional keys: title, file_path (included in results when present).
     """
-    similarities = _cosine_similarity(query_embedding.reshape(1, -1), segment_embeddings)
+    similarities = _cosine_similarity(
+        query_embedding.reshape(1, -1), segment_embeddings
+    )
 
     # Overcollect candidates when dedup is on
-    candidate_k = min(top_k * 3, len(segments_meta)) if dedup_seconds > 0 else min(top_k, len(segments_meta))
+    candidate_k = (
+        min(top_k * 3, len(segments_meta))
+        if dedup_seconds > 0
+        else min(top_k, len(segments_meta))
+    )
     top_indices = np.argsort(-similarities)[:candidate_k]
 
     # Highlight query words (4+ chars to skip common words)
@@ -161,8 +174,12 @@ def _ranked_semantic_search(
         entry = {
             "start": start,
             "end": end,
-            "text": _build_snippet(meta["file_segments"], meta["seg_idx"],
-                                   target_words=context_words, highlight=highlight),
+            "text": _build_snippet(
+                meta["file_segments"],
+                meta["seg_idx"],
+                target_words=context_words,
+                highlight=highlight,
+            ),
             "timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
             "similarity": round(float(similarities[idx]), 4),
         }
@@ -179,8 +196,7 @@ def _ranked_semantic_search(
 
 
 def _get_or_compute_embeddings(
-    segments: List[Dict], audio_hash: str,
-    model_name: str = EMBEDDING_MODEL
+    segments: List[Dict], audio_hash: str, model_name: str = EMBEDDING_MODEL
 ) -> np.ndarray:
     """Get embeddings from memory or compute them."""
     memory = get_transcription_memory()
@@ -197,9 +213,11 @@ def _get_or_compute_embeddings(
 
     # Store them
     memory.set_embeddings(
-        audio_hash, model_name, embeddings,
+        audio_hash,
+        model_name,
+        embeddings,
         segment_count=len(segments),
-        embedding_dim=embeddings.shape[1]
+        embedding_dim=embeddings.shape[1],
     )
 
     return embeddings
@@ -212,7 +230,8 @@ def _write_results_csv(results: List[Dict], output_path: str, query: str) -> str
 
     # Strip **bold** markers from snippets for clean CSV
     import re
-    bold_pattern = re.compile(r'\*\*(.+?)\*\*')
+
+    bold_pattern = re.compile(r"\*\*(.+?)\*\*")
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -233,7 +252,7 @@ def _write_results_csv(results: List[Dict], output_path: str, query: str) -> str
 
     for r in results:
         text = r.get("text", "")
-        text = bold_pattern.sub(r'\1', text)  # strip bold markers
+        text = bold_pattern.sub(r"\1", text)  # strip bold markers
         text = text.replace("...", "").strip()
 
         row = []
@@ -249,11 +268,14 @@ def _write_results_csv(results: List[Dict], output_path: str, query: str) -> str
         f.write(buf.getvalue())
 
     # Strip macOS quarantine flag
-    import subprocess
     import platform
+    import subprocess
+
     if platform.system() == "Darwin":
         try:
-            subprocess.run(["xattr", "-d", "com.apple.quarantine", path], capture_output=True)
+            subprocess.run(
+                ["xattr", "-d", "com.apple.quarantine", path], capture_output=True
+            )
         except Exception:
             pass
 
@@ -301,7 +323,9 @@ def deep_search(
 
     # Encode query
     model = _get_embedding_model_cache().get()
-    query_embedding = model.encode(query, convert_to_numpy=True, show_progress_bar=False)
+    query_embedding = model.encode(
+        query, convert_to_numpy=True, show_progress_bar=False
+    )
 
     # Build metadata list for shared ranking function
     segments_meta = [
@@ -310,8 +334,13 @@ def deep_search(
     ]
 
     results = _ranked_semantic_search(
-        query_embedding, segment_embeddings, segments_meta,
-        query, top_k, context_words, dedup_seconds,
+        query_embedding,
+        segment_embeddings,
+        segments_meta,
+        query,
+        top_k,
+        context_words,
+        dedup_seconds,
     )
 
     return {
@@ -323,9 +352,7 @@ def deep_search(
     }
 
 
-def _search_memory_keyword(
-    query: str, top_k: int, entries: list
-) -> Dict[str, Any]:
+def _search_memory_keyword(query: str, top_k: int, entries: list) -> Dict[str, Any]:
     """Keyword mode: case-insensitive substring match on segment text."""
     query_lower = query.lower()
     results = []
@@ -341,14 +368,16 @@ def _search_memory_keyword(
             text = seg.get("text", "")
             if query_lower in text.lower():
                 start = seg.get("start", 0)
-                results.append({
-                    "title": entry["title"],
-                    "file_path": entry["file_path"],
-                    "start": start,
-                    "end": seg.get("end", 0),
-                    "text": _build_snippet(segments, seg_idx, highlight=[query]),
-                    "timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
-                })
+                results.append(
+                    {
+                        "title": entry["title"],
+                        "file_path": entry["file_path"],
+                        "start": start,
+                        "end": seg.get("end", 0),
+                        "text": _build_snippet(segments, seg_idx, highlight=[query]),
+                        "timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
+                    }
+                )
 
     # Sort by title then timestamp for readable output
     results.sort(key=lambda r: (r["title"], r["start"]))
@@ -368,8 +397,11 @@ def _search_memory_keyword(
 
 
 def _search_memory_semantic(
-    query: str, top_k: int, entries: list,
-    context_words: int = 25, dedup_seconds: float = 0,
+    query: str,
+    top_k: int,
+    entries: list,
+    context_words: int = 25,
+    dedup_seconds: float = 0,
 ) -> Dict[str, Any]:
     """Semantic mode: embedding-based similarity search."""
     # Build global segment list and embedding matrix
@@ -388,10 +420,15 @@ def _search_memory_semantic(
 
         if emb is not None and len(emb) == len(segments):
             for seg_idx, seg in enumerate(segments):
-                all_segments.append({
-                    "seg": seg, "seg_idx": seg_idx, "file_segments": segments,
-                    "title": entry["title"], "file_path": entry["file_path"],
-                })
+                all_segments.append(
+                    {
+                        "seg": seg,
+                        "seg_idx": seg_idx,
+                        "file_segments": segments,
+                        "title": entry["title"],
+                        "file_path": entry["file_path"],
+                    }
+                )
             all_embeddings.append(emb)
 
     if not all_segments:
@@ -409,11 +446,18 @@ def _search_memory_semantic(
 
     # Encode query
     model = _get_embedding_model_cache().get()
-    query_embedding = model.encode(query, convert_to_numpy=True, show_progress_bar=False)
+    query_embedding = model.encode(
+        query, convert_to_numpy=True, show_progress_bar=False
+    )
 
     results = _ranked_semantic_search(
-        query_embedding, global_embeddings, all_segments,
-        query, top_k, context_words, dedup_seconds,
+        query_embedding,
+        global_embeddings,
+        all_segments,
+        query,
+        top_k,
+        context_words,
+        dedup_seconds,
     )
 
     return {
@@ -481,7 +525,9 @@ def search_memory(
                 "model_used": EMBEDDING_MODEL,
             }
         else:
-            result = _search_memory_semantic(query, top_k, entries, context_words, dedup_seconds)
+            result = _search_memory_semantic(
+                query, top_k, entries, context_words, dedup_seconds
+            )
 
     # Write CSV if output path provided
     if output and result.get("results"):
@@ -489,7 +535,6 @@ def search_memory(
         result["csv_path"] = csv_path
 
     return result
-
 
 
 def detect_chapters(
@@ -540,8 +585,7 @@ def detect_chapters(
     similarities = []
     for i in range(len(embeddings) - 1):
         sim = _cosine_similarity(
-            embeddings[i].reshape(1, -1),
-            embeddings[i + 1].reshape(1, -1)
+            embeddings[i].reshape(1, -1), embeddings[i + 1].reshape(1, -1)
         )[0]
         similarities.append(float(sim))
 
@@ -554,20 +598,24 @@ def detect_chapters(
     # Build chapters
     chapters = []
     for idx, start_seg_idx in enumerate(boundaries):
-        end_seg_idx = boundaries[idx + 1] if idx + 1 < len(boundaries) else len(segments)
+        end_seg_idx = (
+            boundaries[idx + 1] if idx + 1 < len(boundaries) else len(segments)
+        )
         chapter_segments = segments[start_seg_idx:end_seg_idx]
         chapter_text = " ".join(s["text"].strip() for s in chapter_segments)
         start = chapter_segments[0]["start"]
         end = chapter_segments[-1]["end"]
-        chapters.append({
-            "chapter_number": idx + 1,
-            "start": start,
-            "end": end,
-            "start_timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
-            "end_timestamp": f"{int(end // 60)}:{int(end % 60):02d}",
-            "text": chapter_text,
-            "segment_count": len(chapter_segments),
-        })
+        chapters.append(
+            {
+                "chapter_number": idx + 1,
+                "start": start,
+                "end": end,
+                "start_timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
+                "end_timestamp": f"{int(end // 60)}:{int(end % 60):02d}",
+                "text": chapter_text,
+                "segment_count": len(chapter_segments),
+            }
+        )
 
     return {
         "chapters": chapters,

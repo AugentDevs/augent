@@ -7,17 +7,17 @@ disk. All similarity values are hardcoded snapshots so any change to ranking
 logic is caught immediately.
 """
 
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
-from unittest.mock import patch, MagicMock
 
 from augent.embeddings import (
-    deep_search,
-    _search_memory_semantic,
     _build_snippet,
     _highlight_keywords,
+    _search_memory_semantic,
+    deep_search,
 )
-
 
 # --- Synthetic data ---
 
@@ -34,8 +34,11 @@ SEGMENT_TEXTS = [
 def _make_segments(n=6):
     """Create n synthetic segments with predictable text and 10-second spacing."""
     return [
-        {"text": SEGMENT_TEXTS[i % len(SEGMENT_TEXTS)],
-         "start": float(i * 10), "end": float(i * 10 + 8)}
+        {
+            "text": SEGMENT_TEXTS[i % len(SEGMENT_TEXTS)],
+            "start": float(i * 10),
+            "end": float(i * 10 + 8),
+        }
         for i in range(n)
     ]
 
@@ -56,6 +59,7 @@ def _make_query_embedding(dim=8):
 
 # --- Fixtures ---
 
+
 @pytest.fixture
 def segments():
     return _make_segments()
@@ -75,28 +79,41 @@ def query_embedding():
 def mock_embedding_model(query_embedding):
     """Mock sentence-transformer model that returns the deterministic query vector."""
     model = MagicMock()
-    model.encode = lambda text, convert_to_numpy=True, show_progress_bar=False: query_embedding
+    model.encode = (
+        lambda text, convert_to_numpy=True, show_progress_bar=False: query_embedding
+    )
     return model
 
 
 @pytest.fixture
 def deep_search_env(segments, embeddings, mock_embedding_model):
     """Patch all external dependencies for deep_search calls."""
+
     class _MockMemory:
         def hash_audio_file(self, path):
             return "fakehash_deep"
+
         def get_embeddings(self, audio_hash, model_name):
             return {"embeddings": embeddings}
+
         def set_embeddings(self, *args, **kwargs):
             pass
 
-    with patch("os.path.exists", return_value=True), \
-         patch("augent.embeddings.get_transcription_memory", return_value=_MockMemory()), \
-         patch("augent.embeddings.transcribe_audio", return_value={
-             "segments": segments, "duration": 60.0, "language": "en", "cached": True,
-         }), \
-         patch("augent.embeddings._get_or_compute_embeddings", return_value=embeddings), \
-         patch("augent.embeddings._get_embedding_model_cache") as mock_cache:
+    with (
+        patch("os.path.exists", return_value=True),
+        patch("augent.embeddings.get_transcription_memory", return_value=_MockMemory()),
+        patch(
+            "augent.embeddings.transcribe_audio",
+            return_value={
+                "segments": segments,
+                "duration": 60.0,
+                "language": "en",
+                "cached": True,
+            },
+        ),
+        patch("augent.embeddings._get_or_compute_embeddings", return_value=embeddings),
+        patch("augent.embeddings._get_embedding_model_cache") as mock_cache,
+    ):
         mock_cache.return_value.get.return_value = mock_embedding_model
         yield
 
@@ -111,31 +128,46 @@ def memory_entries(embeddings):
         s["end"] += 100
 
     return [
-        {"audio_hash": "hash_a", "title": "Podcast A",
-         "file_path": "/fake/podcast_a.mp3", "segments": segs_a,
-         "embeddings": embeddings[:3], "segment_count": 3},
-        {"audio_hash": "hash_b", "title": "Podcast B",
-         "file_path": "/fake/podcast_b.mp3", "segments": segs_b,
-         "embeddings": embeddings[3:], "segment_count": 3},
+        {
+            "audio_hash": "hash_a",
+            "title": "Podcast A",
+            "file_path": "/fake/podcast_a.mp3",
+            "segments": segs_a,
+            "embeddings": embeddings[:3],
+            "segment_count": 3,
+        },
+        {
+            "audio_hash": "hash_b",
+            "title": "Podcast B",
+            "file_path": "/fake/podcast_b.mp3",
+            "segments": segs_b,
+            "embeddings": embeddings[3:],
+            "segment_count": 3,
+        },
     ]
 
 
 @pytest.fixture
 def memory_search_env(mock_embedding_model):
     """Patch external dependencies for _search_memory_semantic calls."""
-    with patch("augent.embeddings._get_or_compute_embeddings"), \
-         patch("augent.embeddings._get_embedding_model_cache") as mock_cache:
+    with (
+        patch("augent.embeddings._get_or_compute_embeddings"),
+        patch("augent.embeddings._get_embedding_model_cache") as mock_cache,
+    ):
         mock_cache.return_value.get.return_value = mock_embedding_model
         yield
 
 
 # --- deep_search (single file) ---
 
+
 class TestDeepSearch:
     """Regression tests for single-file semantic search."""
 
     def test_ranking_produces_exact_snapshot(self, deep_search_env):
-        result = deep_search("/fake/audio.mp3", "exercise neuroplasticity memory", top_k=3)
+        result = deep_search(
+            "/fake/audio.mp3", "exercise neuroplasticity memory", top_k=3
+        )
 
         assert result["query"] == "exercise neuroplasticity memory"
         assert result["total_segments"] == 6
@@ -148,22 +180,35 @@ class TestDeepSearch:
             assert 0.0 <= r["similarity"] <= 1.0
 
         sims = [r["similarity"] for r in result["results"]]
-        assert sims == sorted(sims, reverse=True), "Results must be descending by similarity"
+        assert sims == sorted(
+            sims, reverse=True
+        ), "Results must be descending by similarity"
         assert sims == [0.5518, 0.2502, 0.1047]
         assert [r["start"] for r in result["results"]] == [0.0, 30.0, 50.0]
 
     def test_dedup_reduces_overlapping_results(self, deep_search_env):
-        no_dedup = deep_search("/fake/audio.mp3", "exercise neuroplasticity", top_k=6, dedup_seconds=0)
-        with_dedup = deep_search("/fake/audio.mp3", "exercise neuroplasticity", top_k=6, dedup_seconds=15)
+        no_dedup = deep_search(
+            "/fake/audio.mp3", "exercise neuroplasticity", top_k=6, dedup_seconds=0
+        )
+        with_dedup = deep_search(
+            "/fake/audio.mp3", "exercise neuroplasticity", top_k=6, dedup_seconds=15
+        )
 
         assert len(with_dedup["results"]) <= len(no_dedup["results"])
 
     def test_empty_transcription_returns_no_results(self):
-        with patch("os.path.exists", return_value=True), \
-             patch("augent.embeddings.get_transcription_memory"), \
-             patch("augent.embeddings.transcribe_audio", return_value={
-                 "segments": [], "duration": 0, "cached": False,
-             }):
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("augent.embeddings.get_transcription_memory"),
+            patch(
+                "augent.embeddings.transcribe_audio",
+                return_value={
+                    "segments": [],
+                    "duration": 0,
+                    "cached": False,
+                },
+            ),
+        ):
             result = deep_search("/fake/audio.mp3", "anything")
 
         assert result["results"] == []
@@ -172,12 +217,15 @@ class TestDeepSearch:
 
 # --- _search_memory_semantic (cross-file) ---
 
+
 class TestSearchMemorySemantic:
     """Regression tests for cross-file semantic search."""
 
     def test_ranking_produces_exact_snapshot(self, memory_search_env, memory_entries):
         result = _search_memory_semantic(
-            "exercise neuroplasticity memory", top_k=3, entries=memory_entries,
+            "exercise neuroplasticity memory",
+            top_k=3,
+            entries=memory_entries,
         )
 
         assert result["query"] == "exercise neuroplasticity memory"
@@ -186,19 +234,37 @@ class TestSearchMemorySemantic:
         assert result["total_segments"] == 6
         assert len(result["results"]) == 3
 
-        expected_keys = {"title", "file_path", "start", "end", "text", "timestamp", "similarity"}
+        expected_keys = {
+            "title",
+            "file_path",
+            "start",
+            "end",
+            "text",
+            "timestamp",
+            "similarity",
+        }
         for r in result["results"]:
             assert set(r.keys()) == expected_keys
 
         sims = [r["similarity"] for r in result["results"]]
-        assert sims == sorted(sims, reverse=True), "Results must be descending by similarity"
+        assert sims == sorted(
+            sims, reverse=True
+        ), "Results must be descending by similarity"
         assert sims == [0.5518, 0.2502, 0.1047]
-        assert [r["title"] for r in result["results"]] == ["Podcast A", "Podcast B", "Podcast B"]
+        assert [r["title"] for r in result["results"]] == [
+            "Podcast A",
+            "Podcast B",
+            "Podcast B",
+        ]
         assert [r["start"] for r in result["results"]] == [0.0, 100.0, 120.0]
 
     def test_dedup_merges_within_time_window(self, memory_search_env, memory_entries):
-        no_dedup = _search_memory_semantic("exercise", top_k=6, entries=memory_entries, dedup_seconds=0)
-        with_dedup = _search_memory_semantic("exercise", top_k=6, entries=memory_entries, dedup_seconds=15)
+        no_dedup = _search_memory_semantic(
+            "exercise", top_k=6, entries=memory_entries, dedup_seconds=0
+        )
+        with_dedup = _search_memory_semantic(
+            "exercise", top_k=6, entries=memory_entries, dedup_seconds=15
+        )
 
         assert len(with_dedup["results"]) <= len(no_dedup["results"])
 
@@ -211,6 +277,7 @@ class TestSearchMemorySemantic:
 
 
 # --- Shared helpers ---
+
 
 class TestHighlightKeywords:
     """Tests for _highlight_keywords bold wrapping."""

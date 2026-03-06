@@ -27,47 +27,42 @@ MCP Server (for Claude):
     python -m augent.mcp
 """
 
+from .cli import main
+from .clips import (
+    ClipExtractor,
+    export_clips,
+)
 from .core import (
-    search_audio,
-    search_audio_full,
-    transcribe_audio,
-    transcribe_audio_streaming,
-    search_audio_proximity,
-    search_audio_streaming,
-    get_memory_stats,
+    TranscriptionProgress,
     clear_memory,
     clear_model_cache,
-    list_memories,
     get_memory_by_title,
-    TranscriptionProgress,
+    get_memory_stats,
+    list_memories,
+    search_audio,
+    search_audio_full,
+    search_audio_proximity,
+    search_audio_streaming,
+    transcribe_audio,
+    transcribe_audio_streaming,
 )
-
-from .search import (
-    find_keyword_matches,
-    search_with_proximity,
-    KeywordSearcher,
-)
-
 from .export import (
+    Exporter,
     export_matches,
     export_transcription,
-    Exporter,
 )
-
-from .clips import (
-    export_clips,
-    ClipExtractor,
-)
-
 from .memory import (
-    get_transcription_memory,
-    get_model_cache,
-    TranscriptionMemory,
     MemorizedTranscription,
     ModelCache,
+    TranscriptionMemory,
+    get_model_cache,
+    get_transcription_memory,
 )
-
-from .cli import main
+from .search import (
+    KeywordSearcher,
+    find_keyword_matches,
+    search_with_proximity,
+)
 
 # Optional: Speaker diarization (requires simple-diarizer)
 try:
@@ -85,7 +80,7 @@ except ImportError:
 
 # Optional: Text-to-speech (requires kokoro)
 try:
-    from .tts import text_to_speech, read_aloud
+    from .tts import read_aloud, text_to_speech
 except ImportError:
     text_to_speech = None
     read_aloud = None

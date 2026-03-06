@@ -1,6 +1,7 @@
 """Tests for the export module."""
 
 import pytest
+
 from augent.export import (
     Exporter,
     export_matches,
@@ -8,7 +9,6 @@ from augent.export import (
     format_srt_timestamp,
     format_vtt_timestamp,
 )
-
 
 # Sample data for testing
 SAMPLE_MATCHES = [
@@ -18,7 +18,7 @@ SAMPLE_MATCHES = [
         "timestamp_seconds": 30.5,
         "snippet": "...the startup raised funding...",
         "confidence": 1.0,
-        "match_type": "exact"
+        "match_type": "exact",
     },
     {
         "keyword": "funding",
@@ -26,7 +26,7 @@ SAMPLE_MATCHES = [
         "timestamp_seconds": 105.2,
         "snippet": "...raised significant funding last...",
         "confidence": 1.0,
-        "match_type": "exact"
+        "match_type": "exact",
     },
     {
         "keyword": "startup",
@@ -34,26 +34,14 @@ SAMPLE_MATCHES = [
         "timestamp_seconds": 200.0,
         "snippet": "...another startup company...",
         "confidence": 0.85,
-        "match_type": "fuzzy"
+        "match_type": "fuzzy",
     },
 ]
 
 SAMPLE_SEGMENTS = [
-    {
-        "start": 0.0,
-        "end": 5.0,
-        "text": "Welcome to the podcast about startups."
-    },
-    {
-        "start": 5.0,
-        "end": 10.0,
-        "text": "Today we discuss funding strategies."
-    },
-    {
-        "start": 10.0,
-        "end": 15.0,
-        "text": "Let's get started with our first topic."
-    },
+    {"start": 0.0, "end": 5.0, "text": "Welcome to the podcast about startups."},
+    {"start": 5.0, "end": 10.0, "text": "Today we discuss funding strategies."},
+    {"start": 10.0, "end": 15.0, "text": "Let's get started with our first topic."},
 ]
 
 
@@ -152,7 +140,7 @@ class TestExporterCSV:
                 "timestamp_seconds": 0,
                 "snippet": "...hello, world...",
                 "confidence": 1.0,
-                "match_type": "exact"
+                "match_type": "exact",
             }
         ]
         exporter = Exporter()
@@ -200,6 +188,7 @@ class TestExporterJSON:
         result = exporter.to_json(SAMPLE_MATCHES, grouped=True)
 
         import json
+
         data = json.loads(result)
 
         assert "startup" in data
@@ -211,6 +200,7 @@ class TestExporterJSON:
         result = exporter.to_json(SAMPLE_MATCHES, grouped=False)
 
         import json
+
         data = json.loads(result)
 
         assert isinstance(data, list)
@@ -222,10 +212,11 @@ class TestExporterJSON:
             SAMPLE_MATCHES,
             grouped=True,
             include_metadata=True,
-            metadata={"source": "test.mp3", "model": "base"}
+            metadata={"source": "test.mp3", "model": "base"},
         )
 
         import json
+
         data = json.loads(result)
 
         assert "metadata" in data

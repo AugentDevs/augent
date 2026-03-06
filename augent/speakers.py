@@ -6,7 +6,7 @@ No auth tokens required — all models are open.
 """
 
 import os
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from .core import transcribe_audio
 from .memory import get_transcription_memory
@@ -41,19 +41,21 @@ def identify_speakers(
         # Step 3: Run diarization
         from simple_diarizer.diarizer import Diarizer
 
-        diar = Diarizer(embed_model='ecapa', cluster_method='sc')
+        diar = Diarizer(embed_model="ecapa", cluster_method="sc")
         raw_segments = diar.diarize(audio_path, num_speakers=num_speakers)
 
         # Extract turns
         turns = []
         for seg in raw_segments:
-            turns.append({
-                "speaker": seg["label"],
-                "start": float(seg["start"]),
-                "end": float(seg["end"]),
-            })
+            turns.append(
+                {
+                    "speaker": seg["label"],
+                    "start": float(seg["start"]),
+                    "end": float(seg["end"]),
+                }
+            )
 
-        speakers = sorted(set(t["speaker"] for t in turns))
+        speakers = sorted({t["speaker"] for t in turns})
 
         # Store the result
         memory.set_diarization(audio_hash, speakers, turns, num_speakers)
@@ -71,9 +73,7 @@ def identify_speakers(
     }
 
 
-def _merge(
-    transcript_segments: List[Dict], speaker_turns: List[Dict]
-) -> List[Dict]:
+def _merge(transcript_segments: List[Dict], speaker_turns: List[Dict]) -> List[Dict]:
     """Merge transcription segments with speaker turns by timestamp overlap."""
     merged = []
     for seg in transcript_segments:
@@ -92,12 +92,14 @@ def _merge(
                 best_overlap = overlap
                 best_speaker = turn["speaker"]
 
-        merged.append({
-            "speaker": best_speaker,
-            "start": seg_start,
-            "end": seg_end,
-            "text": seg["text"].strip(),
-            "timestamp": f"{int(seg_start // 60)}:{int(seg_start % 60):02d}",
-        })
+        merged.append(
+            {
+                "speaker": best_speaker,
+                "start": seg_start,
+                "end": seg_end,
+                "text": seg["text"].strip(),
+                "timestamp": f"{int(seg_start // 60)}:{int(seg_start % 60):02d}",
+            }
+        )
 
     return merged

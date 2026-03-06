@@ -2,6 +2,7 @@
 Augent Web UI - Gradio interface with live transcription streaming
 """
 
+
 # ============================================
 # RUNTIME PATCH: Fix gradio_client schema bug
 # Must run BEFORE importing gradio
@@ -13,23 +14,28 @@ def _patch_gradio_client():
 
         # Patch get_type to handle non-dict schemas
         original_get_type = client_utils.get_type
+
         def patched_get_type(schema):
             if not isinstance(schema, dict):
                 return "any"
             return original_get_type(schema)
+
         client_utils.get_type = patched_get_type
 
         # Patch _json_schema_to_python_type to handle bool schemas
         original_json_schema = client_utils._json_schema_to_python_type
+
         def patched_json_schema(schema, defs=None):
             if schema is True or schema is False:
                 return "Any"
             if schema == {}:
                 return "Any"
             return original_json_schema(schema, defs)
+
         client_utils._json_schema_to_python_type = patched_json_schema
     except Exception:
         pass  # If patch fails, continue anyway
+
 
 _patch_gradio_client()
 # ============================================
@@ -37,12 +43,12 @@ _patch_gradio_client()
 import json
 import os
 import re
-import gradio as gr
 from typing import Generator, Tuple
+
+import gradio as gr
 
 from .memory import get_model_cache, get_transcription_memory
 from .search import KeywordSearcher
-
 
 CUSTOM_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
@@ -381,13 +387,14 @@ def format_time(seconds: float) -> str:
 def highlight_keyword_in_snippet(snippet: str, keyword: str) -> str:
     clean_snippet = snippet.replace("...", "").strip()
     pattern = re.compile(re.escape(keyword), re.IGNORECASE)
-    return pattern.sub(f"<strong style='color:#FFFFFF !important; font-weight:700 !important;'>{keyword}</strong>", clean_snippet)
+    return pattern.sub(
+        f"<strong style='color:#FFFFFF !important; font-weight:700 !important;'>{keyword}</strong>",
+        clean_snippet,
+    )
 
 
 def search_audio_streaming(
-    audio_path: str,
-    keywords_str: str,
-    model_size: str
+    audio_path: str, keywords_str: str, model_size: str
 ) -> Generator[Tuple[str, str, str], None, None]:
     if not audio_path:
         yield "", "{}", "<p style='color:#00F060;'>Upload an audio file to begin</p>"
@@ -412,29 +419,33 @@ def search_audio_streaming(
     stored = memory.get(audio_path, model_size)
 
     if stored:
-        log_lines.append(f"  [memory] loaded from memory")
+        log_lines.append("  [memory] loaded from memory")
         log_lines.append(f"  [info] duration: {format_time(stored.duration)}")
         log_lines.append("")
-        yield "\n".join(log_lines), "{}", "<p style='color:#00F060;'>Loaded from memory</p>"
+        yield "\n".join(
+            log_lines
+        ), "{}", "<p style='color:#00F060;'>Loaded from memory</p>"
 
         all_words = stored.words
         duration = stored.duration
 
     else:
         log_lines.append(f"  [model] loading {model_size}...")
-        yield "\n".join(log_lines), "{}", "<p style='color:#00F060;'>Loading model...</p>"
+        yield "\n".join(
+            log_lines
+        ), "{}", "<p style='color:#00F060;'>Loading model...</p>"
 
         model_cache = get_model_cache()
         model = model_cache.get(model_size)
 
-        log_lines.append(f"  [model] ready")
+        log_lines.append("  [model] ready")
         log_lines.append("")
-        yield "\n".join(log_lines), "{}", "<p style='color:#00F060;'>Transcribing...</p>"
+        yield "\n".join(
+            log_lines
+        ), "{}", "<p style='color:#00F060;'>Transcribing...</p>"
 
         segments_gen, info = model.transcribe(
-            audio_path,
-            word_timestamps=True,
-            vad_filter=True
+            audio_path, word_timestamps=True, vad_filter=True
         )
 
         duration = info.duration
@@ -446,36 +457,44 @@ def search_audio_streaming(
         log_lines.append("")
 
         for segment in segments_gen:
-            segments.append({
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text
-            })
+            segments.append(
+                {"start": segment.start, "end": segment.end, "text": segment.text}
+            )
 
             ts = format_time(segment.start)
             log_lines.append(f"  [{ts}] {segment.text.strip()}")
 
             if segment.words:
                 for word in segment.words:
-                    all_words.append({
-                        "word": word.word.strip(),
-                        "start": word.start,
-                        "end": word.end
-                    })
+                    all_words.append(
+                        {
+                            "word": word.word.strip(),
+                            "start": word.start,
+                            "end": word.end,
+                        }
+                    )
                     clean = word.word.lower().strip(".,!?;:'\"")
                     for kw in keywords:
                         if kw in clean:
-                            log_lines.append(f"         >> match: '{kw}' @ {format_time(word.start)}")
+                            log_lines.append(
+                                f"         >> match: '{kw}' @ {format_time(word.start)}"
+                            )
 
-            yield "\n".join(log_lines), "{}", "<p style='color:#00F060;'>Transcribing...</p>"
+            yield "\n".join(
+                log_lines
+            ), "{}", "<p style='color:#00F060;'>Transcribing...</p>"
 
-        memory.set(audio_path, model_size, {
-            "text": " ".join(s["text"].strip() for s in segments),
-            "language": info.language,
-            "duration": duration,
-            "segments": segments,
-            "words": all_words
-        })
+        memory.set(
+            audio_path,
+            model_size,
+            {
+                "text": " ".join(s["text"].strip() for s in segments),
+                "language": info.language,
+                "duration": duration,
+                "segments": segments,
+                "words": all_words,
+            },
+        )
 
     log_lines.append("")
     log_lines.append("  [search] finding matches...")
@@ -489,11 +508,13 @@ def search_audio_streaming(
         kw = m.keyword
         if kw not in grouped:
             grouped[kw] = []
-        grouped[kw].append({
-            "timestamp": m.timestamp,
-            "timestamp_seconds": m.timestamp_seconds,
-            "snippet": m.snippet
-        })
+        grouped[kw].append(
+            {
+                "timestamp": m.timestamp,
+                "timestamp_seconds": m.timestamp_seconds,
+                "snippet": m.snippet,
+            }
+        )
 
     log_lines.append("")
     log_lines.append("─" * 45)
@@ -506,16 +527,24 @@ def search_audio_streaming(
 
     html_parts = []
     html_parts.append("<div style='font-family:Montserrat,sans-serif;color:#00F060;'>")
-    html_parts.append(f"<h3 style='color:#00F060;margin-bottom:16px;'>Found {len(matches)} matches</h3>")
+    html_parts.append(
+        f"<h3 style='color:#00F060;margin-bottom:16px;'>Found {len(matches)} matches</h3>"
+    )
 
     if len(matches) == 0:
         html_parts.append("<p>No matches found.</p>")
     else:
         for kw, kw_matches in grouped.items():
-            html_parts.append(f"<h4 style='color:#00FF00;margin:16px 0 8px;'>{kw} ({len(kw_matches)})</h4>")
+            html_parts.append(
+                f"<h4 style='color:#00FF00;margin:16px 0 8px;'>{kw} ({len(kw_matches)})</h4>"
+            )
             html_parts.append("<table style='width:100%;border-collapse:collapse;'>")
-            html_parts.append("<tr><th style='text-align:left;padding:8px;border-bottom:1px solid #00F060;width:80px;color:#00F060;'>Time</th>")
-            html_parts.append("<th style='text-align:left;padding:8px;border-bottom:1px solid #00F060;color:#00F060;'>Context</th></tr>")
+            html_parts.append(
+                "<tr><th style='text-align:left;padding:8px;border-bottom:1px solid #00F060;width:80px;color:#00F060;'>Time</th>"
+            )
+            html_parts.append(
+                "<th style='text-align:left;padding:8px;border-bottom:1px solid #00F060;color:#00F060;'>Context</th></tr>"
+            )
 
             for m in kw_matches:
                 ts = m["timestamp"]
@@ -535,34 +564,32 @@ def search_audio_streaming(
 
 def create_demo() -> gr.Blocks:
     with gr.Blocks(
-        title="Augent Web UI",
-        analytics_enabled=False,
-        css=CUSTOM_CSS
+        title="Augent Web UI", analytics_enabled=False, css=CUSTOM_CSS
     ) as demo:
         gr.Markdown("# Augent")
 
         with gr.Row():
             with gr.Column(scale=1):
                 audio_input = gr.Audio(
-                    type="filepath",
-                    label="Audio File",
-                    sources=["upload"]
+                    type="filepath", label="Audio File", sources=["upload"]
                 )
 
                 keywords_input = gr.Textbox(
                     label="Keywords",
                     placeholder="wormhole, hourglass, CLI",
-                    info="Comma-separated"
+                    info="Comma-separated",
                 )
 
                 model_dropdown = gr.Dropdown(
                     choices=["tiny", "base", "small", "medium", "large"],
                     value="tiny",
                     label="Model",
-                    info="Larger = slower but more accurate"
+                    info="Larger = slower but more accurate",
                 )
 
-                search_btn = gr.Button("SEARCH", variant="primary", size="lg", elem_classes=["primary-btn"])
+                search_btn = gr.Button(
+                    "SEARCH", variant="primary", size="lg", elem_classes=["primary-btn"]
+                )
 
                 gr.Markdown("""
 ---
@@ -577,7 +604,7 @@ def create_demo() -> gr.Blocks:
                     lines=25,
                     max_lines=25,
                     autoscroll=True,
-                    elem_classes=["log-output"]
+                    elem_classes=["log-output"],
                 )
 
                 # ALWAYS force scroll to bottom + Shadow DOM fixes
@@ -728,7 +755,6 @@ setTimeout(function() {
 }, 100);
 </script>""")
 
-
                 with gr.Tabs():
                     with gr.TabItem("Results"):
                         results_html = gr.HTML(
@@ -741,7 +767,7 @@ setTimeout(function() {
             fn=search_audio_streaming,
             inputs=[audio_input, keywords_input, model_dropdown],
             outputs=[log_output, results_json, results_html],
-            show_progress="hidden"
+            show_progress="hidden",
         )
 
         gr.Markdown("---\n**Augent**")
@@ -754,16 +780,15 @@ demo = create_demo()
 
 def _kill_port(port: int):
     """Kill any process using the specified port."""
-    import subprocess
     import signal
+    import subprocess
+
     try:
         # Find process using the port
         result = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
-            capture_output=True,
-            text=True
+            ["lsof", "-ti", f":{port}"], capture_output=True, text=True
         )
-        pids = result.stdout.strip().split('\n')
+        pids = result.stdout.strip().split("\n")
         for pid in pids:
             if pid:
                 try:
@@ -776,22 +801,28 @@ def _kill_port(port: int):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Augent Web UI")
-    parser.add_argument("--port", "-p", type=int, default=9797, help="Port to run on (default: 9797)")
-    parser.add_argument("--share", action="store_true", help="Create public Gradio link")
+    parser.add_argument(
+        "--port", "-p", type=int, default=9797, help="Port to run on (default: 9797)"
+    )
+    parser.add_argument(
+        "--share", action="store_true", help="Create public Gradio link"
+    )
     args = parser.parse_args()
 
     # Auto-kill anything on the port first
     _kill_port(args.port)
 
     import time
+
     time.sleep(0.5)  # Brief pause to ensure port is freed
 
     demo.launch(
         server_name="127.0.0.1",
         server_port=args.port,
         share=args.share,
-        show_error=True
+        show_error=True,
     )
 
 
