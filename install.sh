@@ -649,8 +649,8 @@ verify_packages() {
         missing_extras+=("semantic")
     fi
 
-    if ! $PYTHON_CMD -c "import simple_diarizer" 2>/dev/null; then
-        log_warn "simple-diarizer not available (speaker identification)"
+    if ! $PYTHON_CMD -c "import pyannote.audio" 2>/dev/null; then
+        log_warn "pyannote-audio not available (speaker identification)"
         missing_extras+=("speakers")
     fi
 

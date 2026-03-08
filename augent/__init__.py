@@ -64,7 +64,7 @@ from .search import (
     search_with_proximity,
 )
 
-# Optional: Speaker diarization (requires simple-diarizer)
+# Optional: Speaker diarization (requires pyannote-audio)
 try:
     from .speakers import identify_speakers
 except ImportError:

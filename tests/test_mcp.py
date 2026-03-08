@@ -78,7 +78,7 @@ class TestToolsList:
     def test_returns_15_tools(self):
         resp = capture_stdout(handle_tools_list, 1)
         tools = resp["result"]["tools"]
-        assert len(tools) == 15
+        assert len(tools) == 16
 
     def test_all_tools_have_required_fields(self):
         resp = capture_stdout(handle_tools_list, 1)
@@ -107,6 +107,7 @@ class TestToolsList:
             "memory_stats",
             "clear_memory",
             "search_memory",
+            "separate_audio",
         }
         assert names == expected
 

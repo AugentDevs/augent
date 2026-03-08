@@ -96,7 +96,7 @@ else:
         transcribe_audio,
     )
 
-# Optional dependencies (sentence-transformers, simple-diarizer, kokoro)
+# Optional dependencies (sentence-transformers, pyannote-audio, kokoro)
 # are imported lazily inside handler functions so that installing them
 # mid-session works without restarting the MCP server.
 
@@ -1523,8 +1523,8 @@ def handle_identify_speakers(arguments: dict) -> dict:
         from .speakers import identify_speakers
     except ImportError as err:
         raise RuntimeError(
-            "Missing dependencies: simple-diarizer. "
-            "Install with: pip install simple-diarizer"
+            "Missing dependencies: pyannote-audio. "
+            "Install with: pip install augent[speakers]"
         ) from err
 
     audio_path = arguments.get("audio_path")

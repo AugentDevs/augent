@@ -1,8 +1,14 @@
 """
 Augent Speakers - Speaker diarization
 
-Uses simple_diarizer (built on speechbrain) to identify who speaks when.
-No auth tokens required — all models are open.
+Uses pyannote-audio for state-of-the-art speaker diarization.
+Automatically detects who speaks when and how many speakers are present.
+
+Requires:
+    pip install augent[speakers]
+    A Hugging Face token (free) to download the pretrained model.
+    Accept the license at https://huggingface.co/pyannote/speaker-diarization-3.1
+    Then set HF_TOKEN env var or run: huggingface-cli login
 """
 
 import os
@@ -10,6 +16,26 @@ from typing import Any, Dict, List, Optional
 
 from .core import transcribe_audio
 from .memory import get_transcription_memory
+
+
+def _get_hf_token() -> Optional[str]:
+    """Get Hugging Face token from environment or cached login."""
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if token:
+        return token
+
+    # Check huggingface-cli login token
+    for token_path in [
+        os.path.expanduser("~/.huggingface/token"),
+        os.path.expanduser("~/.cache/huggingface/token"),
+    ]:
+        if os.path.exists(token_path):
+            with open(token_path) as f:
+                stored = f.read().strip()
+                if stored:
+                    return stored
+
+    return None
 
 
 def identify_speakers(
@@ -20,7 +46,7 @@ def identify_speakers(
     """
     Identify speakers in audio and return speaker-labeled transcript.
 
-    Runs faster-whisper transcription (from memory) then speechbrain diarization,
+    Runs faster-whisper transcription (from memory) then pyannote diarization,
     merging results by timestamp overlap.
     """
     if not os.path.exists(audio_path):
@@ -38,20 +64,45 @@ def identify_speakers(
         turns = stored_diarization["turns"]
         speakers = stored_diarization["speakers"]
     else:
-        # Step 3: Run diarization
-        from simple_diarizer.diarizer import Diarizer
+        # Step 3: Run diarization with pyannote
+        try:
+            from pyannote.audio import Pipeline
+        except ImportError:
+            raise ImportError(
+                "pyannote-audio is not installed. Install with: pip install augent[speakers]\n"
+                "Or directly: pip install pyannote-audio"
+            ) from None
 
-        diar = Diarizer(embed_model="ecapa", cluster_method="sc")
-        raw_segments = diar.diarize(audio_path, num_speakers=num_speakers)
+        hf_token = _get_hf_token()
+        if not hf_token:
+            raise RuntimeError(
+                "Hugging Face token required for pyannote speaker diarization.\n"
+                "1. Create a free token at https://huggingface.co/settings/tokens\n"
+                "2. Accept the model license at https://huggingface.co/pyannote/speaker-diarization-3.1\n"
+                "3. Set the token: export HF_TOKEN=your_token\n"
+                "   Or run: huggingface-cli login"
+            )
 
-        # Extract turns
+        pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.1",
+            use_auth_token=hf_token,
+        )
+
+        # Run diarization
+        kwargs = {}
+        if num_speakers is not None:
+            kwargs["num_speakers"] = num_speakers
+
+        diarization = pipeline(audio_path, **kwargs)
+
+        # Extract turns from pyannote Annotation
         turns = []
-        for seg in raw_segments:
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
             turns.append(
                 {
-                    "speaker": seg["label"],
-                    "start": float(seg["start"]),
-                    "end": float(seg["end"]),
+                    "speaker": speaker,
+                    "start": float(turn.start),
+                    "end": float(turn.end),
                 }
             )
 

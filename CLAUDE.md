@@ -206,7 +206,7 @@ Returns `{stems: {vocals: "/path", ...}, vocals_path: "/path/to/vocals.wav", mod
 **Workflow:** Use `vocals_path` from the response as the `audio_path` for transcribe_audio, search_audio, deep_search, or any other tool.
 
 ### identify_speakers
-Identify who speaks when in audio using speaker diarization. No auth tokens required.
+Identify who speaks when in audio using pyannote speaker diarization. Requires a free Hugging Face token (set HF_TOKEN env var or run `huggingface-cli login`).
 ```
 audio_path: "/path/to/audio.mp3"
 model_size: "tiny" (optional, default)

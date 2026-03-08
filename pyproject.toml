@@ -58,7 +58,7 @@ clips = [
     "pydub>=0.25.0",
 ]
 speakers = [
-    "simple-diarizer",
+    "pyannote-audio>=3.1.0",
 ]
 semantic = [
     "sentence-transformers>=2.2.0",
@@ -77,7 +77,7 @@ all = [
     "gradio>=4.0.0,<5.0.0",
     "huggingface-hub>=0.20.0,<1.7.0",
     "pydub>=0.25.0",
-    "simple-diarizer",
+    "pyannote-audio>=3.1.0",
     "sentence-transformers>=2.2.0",
     "kokoro>=0.7.0",
     "soundfile",
@@ -138,6 +138,7 @@ ignore = [
 "augent/mcp.py" = ["F401"]      # availability checks (try/import/except)
 "augent/clips.py" = ["F401"]    # availability check (pydub)
 "augent/separator.py" = ["F401"]  # availability check (demucs)
+"augent/speakers.py" = ["F401"]   # lazy import (pyannote)
 
 [tool.ruff.lint.isort]
 known-first-party = ["augent"]
