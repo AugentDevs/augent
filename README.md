@@ -25,7 +25,8 @@
   <a href="https://augent.app">Website</a> ·
   <a href="https://docs.augent.app">Docs</a> ·
   <a href="https://docs.augent.app/tools/download-audio">Tool Reference</a> ·
-  <a href="CHANGELOG.md">Changelog</a>
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="https://discord.com/invite/DNmaZtaE7b">Discord</a>
 </p>
 
 **Augent** turns any audio or video source into structured, searchable intelligence for agents. Give it URLs or files. It downloads, transcribes, indexes, and stores everything in persistent memory. Search by keyword or meaning, find where concepts intersect, identify speakers, generate chapters and notes, batch process entire libraries, and more. One install, full pipeline, entirely on your machine.
