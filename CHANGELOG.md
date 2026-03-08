@@ -6,12 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+---
+
+## [2026.3.8] - 2026-03-08
+
 ### Added
 
-- **78 new tests:** CLI, TTS, speakers, and clips modules now fully tested (133 → 211 total)
+- **`separate_audio` MCP tool:** audio source separation using Meta's Demucs v4. Isolates vocals from music, background noise, and other sounds. Feeds directly into the transcription pipeline for clean results on noisy recordings.
+- **`separator` optional dependency group:** `pip install augent[separator]` installs Demucs. Also included in `augent[all]`.
+- **Hash-based separation caching:** separated stems are stored at `~/.augent/separated/` by file hash. First run processes, every run after is instant.
+- **Vocals-only mode:** default two-stem separation (vocals + no_vocals) is faster than full 4-stem. Set `vocals_only: false` for all 4 stems (vocals, drums, bass, other).
+- **Installer support for Demucs:** `install.sh` now includes separator in the extras fallback chain and verifies demucs during package verification.
+- **78 new tests:** CLI, TTS, speakers, and clips modules now fully tested (133 to 211 total)
 - **CodeQL security scanning:** weekly + on every push/PR
 - **Dependabot:** daily automated dependency and GitHub Actions updates
 - **Makefile:** `make test`, `make lint`, `make fmt`, `make check` for developer convenience
+- **Discord badge and link** in README
+
+### Changed
+
+- **Speaker diarization upgraded to pyannote-audio:** replaced the abandoned simple-diarizer (155 stars, last release 2022) with pyannote-audio (9.3k stars, actively maintained). Same tool interface, same caching, dramatically better accuracy. Requires a free Hugging Face token.
 
 ### Improved
 
