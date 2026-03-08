@@ -34,7 +34,7 @@ ruff check augent/
 pytest tests/ -v --tb=short
 ```
 
-Tests run on Python 3.10, 3.11, and 3.12 via CI.
+Tests run on Python 3.10, 3.11, 3.12, and 3.13 via CI.
 
 ### Project Structure
 
