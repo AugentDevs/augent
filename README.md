@@ -188,10 +188,21 @@ python3 -m augent.web
 
 Open: **http://127.0.0.1:9797**
 
-1. **Upload** an audio file (MP3, WAV, M4A, etc.)
+**Search view:**
+1. **Upload** an audio file or **paste a YouTube/video URL** to download audio directly
 2. **Enter keywords** separated by commas
-3. **Click SEARCH**
-4. **View results** with timestamps and context
+3. **Click SEARCH** — results stream live with timestamps and context
+4. **YouTube timestamps** are automatically hyperlinked when the source is YouTube
+
+**Memory Explorer:**
+- Browse all stored transcriptions with titles, durations, and dates
+- View full transcripts with clickable YouTube timestamps
+- **Delete** individual transcriptions from memory
+- **Show in Finder** to reveal the source file
+- **Share as HTML** — self-contained, shareable transcript pages
+- Search across all memories by keyword
+
+**YouTube URL persistence:** When audio is downloaded from YouTube (via MCP, CLI, or the web UI), the source URL is permanently stored by file hash. Any future search or transcription of that file — even weeks later, even from a different path — automatically includes clickable YouTube timestamps. No need to re-enter the URL.
 
 <details>
 <summary>Web UI options</summary>
