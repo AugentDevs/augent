@@ -126,8 +126,12 @@ class TranscriptionMemory:
             conn.commit()
 
     @staticmethod
-    def _validate_audio_path(file_path: str) -> str:
-        """Resolve and validate that a file path is safe to open."""
+    def hash_audio_file(file_path: str) -> str:
+        """
+        Generate a hash of the audio file content.
+        Uses SHA256 for reliable uniqueness.
+        """
+        hasher = hashlib.sha256()
         resolved = os.path.realpath(file_path)
         home = os.path.expanduser("~")
         if not resolved.startswith(home + os.sep) and not resolved.startswith(
@@ -138,17 +142,7 @@ class TranscriptionMemory:
             )
         if not os.path.isfile(resolved):
             raise FileNotFoundError(f"Audio file not found: {resolved}")
-        return resolved
-
-    @staticmethod
-    def hash_audio_file(file_path: str) -> str:
-        """
-        Generate a hash of the audio file content.
-        Uses SHA256 for reliable uniqueness.
-        """
-        hasher = hashlib.sha256()
-        file_path = TranscriptionMemory._validate_audio_path(file_path)
-        with open(file_path, "rb") as f:  # nosec
+        with open(resolved, "rb") as f:
             # Read in chunks for memory efficiency with large files
             for chunk in iter(lambda: f.read(8192), b""):
                 hasher.update(chunk)
