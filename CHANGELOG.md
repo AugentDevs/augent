@@ -213,7 +213,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Web UI v1:** polished Gradio interface with failproof startup
+- **Web UI v1:** local web interface with failproof startup
 - **CI/CD:** GitHub Actions testing on Python 3.10, 3.11, 3.12
 - **Professional installer:** one-liner `curl | bash` setup
 - Logo and branding

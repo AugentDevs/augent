@@ -48,7 +48,7 @@ augent/
 ├── tts.py          # Text-to-speech (Kokoro)
 ├── memory.py       # Three-layer memory (SQLite)
 ├── cli.py          # CLI interface
-├── web.py          # Web UI (Gradio)
+├── web.py          # Web UI (FastAPI)
 ├── export.py       # Export formats (JSON, CSV, SRT, VTT, MD)
 └── clips.py        # Audio clip extraction
 ```

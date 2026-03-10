@@ -96,7 +96,7 @@ augent/
 ├── tts.py          # Text-to-speech (Kokoro)
 ├── memory.py       # Three-layer memory (SQLite)
 ├── cli.py          # CLI interface
-├── web.py          # Web UI (Gradio)
+├── web.py          # Web UI (FastAPI)
 ├── export.py       # Export formats (JSON, CSV, SRT, VTT, MD)
 └── clips.py        # Audio clip extraction
 ```
@@ -200,7 +200,6 @@ Open: **http://127.0.0.1:9797**
 |:--------|:------------|
 | `python3 -m augent.web` | Start on port 9797 |
 | `python3 -m augent.web --port 3000` | Custom port |
-| `python3 -m augent.web --share` | Create public link |
 
 </details>
 
