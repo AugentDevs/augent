@@ -870,18 +870,21 @@ def handle_download_audio(arguments: dict) -> dict:
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Check for yt-dlp
-    if not shutil.which("yt-dlp"):
+    # Find yt-dlp — prefer brew (stays current) over pip
+    ytdlp = shutil.which(
+        "yt-dlp", path="/opt/homebrew/bin:/usr/local/bin"
+    ) or shutil.which("yt-dlp")
+    if not ytdlp:
         raise RuntimeError("yt-dlp not found. Install with: brew install yt-dlp")
 
     # Check for aria2c (optional but recommended)
     has_aria2c = shutil.which("aria2c") is not None
 
-    # Build command
+    # Build command — bestaudio/best fallback handles YouTube SABR streaming
     cmd = [
-        "yt-dlp",
+        ytdlp,
         "-f",
-        "bestaudio",
+        "bestaudio/best",
         "--concurrent-fragments",
         "4",
         "--no-playlist",

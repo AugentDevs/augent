@@ -1364,14 +1364,17 @@ async def download_and_search(request: Request):
         # Download audio using yt-dlp
         download_dir = tempfile.mkdtemp(prefix="augent_dl_")
         try:
-            if not shutil.which("yt-dlp"):
+            ytdlp = shutil.which(
+                "yt-dlp", path="/opt/homebrew/bin:/usr/local/bin"
+            ) or shutil.which("yt-dlp")
+            if not ytdlp:
                 yield send("log", text="  [error] yt-dlp not found")
                 return
 
             cmd = [
-                "yt-dlp",
+                ytdlp,
                 "-f",
-                "bestaudio",
+                "bestaudio/best",
                 "--concurrent-fragments",
                 "4",
                 "--no-playlist",

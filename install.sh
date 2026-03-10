@@ -538,18 +538,22 @@ install_audio_downloader() {
     log_info "Installing audio-downloader..."
     start_spinner "Setting up yt-dlp + aria2"
 
-    # Install yt-dlp and aria2
+    # Install yt-dlp and aria2 — always upgrade yt-dlp to avoid stale versions
+    # YouTube frequently changes its API; outdated yt-dlp = broken downloads
     case "$PKG_MGR" in
         brew)
-            # Prefer brew install (reliable on macOS, always in PATH)
-            if ! command_exists yt-dlp; then
+            if command_exists yt-dlp; then
+                brew upgrade yt-dlp >/dev/null 2>&1 || true
+            else
                 brew install yt-dlp >/dev/null 2>&1 || true
             fi
             command_exists aria2c || brew install aria2 >/dev/null 2>&1
             command_exists espeak-ng || brew install espeak-ng >/dev/null 2>&1
             ;;
         apt)
-            if ! command_exists yt-dlp; then
+            if command_exists yt-dlp; then
+                env $pip_env $PYTHON_CMD -m pip install -U yt-dlp --quiet $pip_flags 2>/dev/null || true
+            else
                 env $pip_env $PYTHON_CMD -m pip install yt-dlp --quiet $pip_flags 2>/dev/null || \
                 (sudo apt-get update -qq && sudo apt-get install -y yt-dlp) >/dev/null 2>&1 || true
             fi
@@ -557,7 +561,9 @@ install_audio_downloader() {
             command_exists espeak-ng || sudo apt-get install -y espeak-ng >/dev/null 2>&1
             ;;
         *)
-            if ! command_exists yt-dlp; then
+            if command_exists yt-dlp; then
+                env $pip_env $PYTHON_CMD -m pip install -U yt-dlp --quiet $pip_flags 2>/dev/null || true
+            else
                 env $pip_env $PYTHON_CMD -m pip install yt-dlp --quiet $pip_flags 2>/dev/null || true
             fi
             ;;

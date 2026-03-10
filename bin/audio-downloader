@@ -83,7 +83,7 @@ download() {
     echo ""
 
     local cmd=(yt-dlp
-        -f "bestaudio"
+        -f "bestaudio/best"
         --concurrent-fragments 4
         --no-playlist
         -o "$OUTPUT_DIR/%(title)s.%(ext)s"
@@ -101,7 +101,7 @@ download() {
     elif [ "$USE_ARIA" = true ]; then
         echo -e "\n${YELLOW}Retrying without aria2c...${NC}\n"
         local fallback_cmd=(yt-dlp
-            -f "bestaudio"
+            -f "bestaudio/best"
             --concurrent-fragments 4
             --no-playlist
             -o "$OUTPUT_DIR/%(title)s.%(ext)s"
