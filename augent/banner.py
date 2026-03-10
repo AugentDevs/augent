@@ -29,6 +29,9 @@ COLORS = {
 def render_banner(text="AUGENT", color="green", plain=False):
     """Render text as ASCII art banner.
 
+    Uses background-colored spaces instead of Unicode block characters so the
+    banner renders identically across all terminals (iTerm2, Terminal.app, SSH).
+
     Args:
         text: Text to render (default: AUGENT)
         color: Color name from COLORS dict, or hex like '#FF0000' (default: green)
@@ -44,29 +47,66 @@ def render_banner(text="AUGENT", color="green", plain=False):
     if plain:
         return "\n".join(lines)
 
-    # Resolve color
-    ansi = _resolve_color(color)
-    colored = "\n".join(f"{ansi}{line}{RESET}" for line in lines)
-    return colored
+    # Convert Unicode block/box-drawing chars to background-colored spaces.
+    # The ansi_shadow font uses █╗╔╚╝║═ which have "Ambiguous" Unicode width
+    # and render inconsistently across terminals. Background-colored spaces
+    # always fill exactly one cell.
+    ansi_bg = _resolve_color_bg(color)
+    result_lines = []
+    for line in lines:
+        out = ""
+        in_block = False
+        for ch in line:
+            if ch != " ":
+                if not in_block:
+                    out += ansi_bg
+                    in_block = True
+                out += " "
+            else:
+                if in_block:
+                    out += RESET
+                    in_block = False
+                out += " "
+        if in_block:
+            out += RESET
+        result_lines.append(out)
+    return "\n".join(result_lines)
 
 
 def _resolve_color(color):
-    """Resolve a color name or hex code to an ANSI escape sequence."""
+    """Resolve a color name or hex code to an ANSI foreground escape sequence."""
     if color in COLORS:
         return COLORS[color]
-    # Try hex code (#RRGGBB or RRGGBB)
+    r, g, b = _parse_hex(color)
+    if r is not None:
+        return f"\033[38;2;{r};{g};{b}m"
+    return AUGENT_GREEN
+
+
+def _resolve_color_bg(color):
+    """Resolve a color name or hex code to an ANSI background escape sequence."""
+    if color in COLORS:
+        # Convert foreground \033[38;2;R;G;Bm to background \033[48;2;R;G;Bm
+        return COLORS[color].replace("[38;", "[48;")
+    r, g, b = _parse_hex(color)
+    if r is not None:
+        return f"\033[48;2;{r};{g};{b}m"
+    return AUGENT_GREEN.replace("[38;", "[48;")
+
+
+def _parse_hex(color):
+    """Parse hex color string to (r, g, b) tuple, or (None, None, None)."""
     hex_str = color.lstrip("#")
     if len(hex_str) == 6:
         try:
-            r, g, b = (
+            return (
                 int(hex_str[0:2], 16),
                 int(hex_str[2:4], 16),
                 int(hex_str[4:6], 16),
             )
-            return f"\033[38;2;{r};{g};{b}m"
         except ValueError:
             pass
-    return AUGENT_GREEN
+    return (None, None, None)
 
 
 def print_banner(text="AUGENT", color="green", file=sys.stderr):
