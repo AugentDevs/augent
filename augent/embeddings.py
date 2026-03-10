@@ -189,6 +189,8 @@ def _ranked_semantic_search(
             entry["title"] = meta["title"]
         if "file_path" in meta:
             entry["file_path"] = meta["file_path"]
+        if meta.get("source_url"):
+            entry["source_url"] = meta["source_url"]
 
         results.append(entry)
 
@@ -368,16 +370,17 @@ def _search_memory_keyword(query: str, top_k: int, entries: list) -> Dict[str, A
             text = seg.get("text", "")
             if query_lower in text.lower():
                 start = seg.get("start", 0)
-                results.append(
-                    {
-                        "title": entry["title"],
-                        "file_path": entry["file_path"],
-                        "start": start,
-                        "end": seg.get("end", 0),
-                        "text": _build_snippet(segments, seg_idx, highlight=[query]),
-                        "timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
-                    }
-                )
+                r = {
+                    "title": entry["title"],
+                    "file_path": entry["file_path"],
+                    "start": start,
+                    "end": seg.get("end", 0),
+                    "text": _build_snippet(segments, seg_idx, highlight=[query]),
+                    "timestamp": f"{int(start // 60)}:{int(start % 60):02d}",
+                }
+                if entry.get("source_url"):
+                    r["source_url"] = entry["source_url"]
+                results.append(r)
 
     # Sort by title then timestamp for readable output
     results.sort(key=lambda r: (r["title"], r["start"]))
@@ -420,15 +423,16 @@ def _search_memory_semantic(
 
         if emb is not None and len(emb) == len(segments):
             for seg_idx, seg in enumerate(segments):
-                all_segments.append(
-                    {
-                        "seg": seg,
-                        "seg_idx": seg_idx,
-                        "file_segments": segments,
-                        "title": entry["title"],
-                        "file_path": entry["file_path"],
-                    }
-                )
+                meta = {
+                    "seg": seg,
+                    "seg_idx": seg_idx,
+                    "file_segments": segments,
+                    "title": entry["title"],
+                    "file_path": entry["file_path"],
+                }
+                if entry.get("source_url"):
+                    meta["source_url"] = entry["source_url"]
+                all_segments.append(meta)
             all_embeddings.append(emb)
 
     if not all_segments:

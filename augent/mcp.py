@@ -122,6 +122,33 @@ def _strip_quarantine(path: str) -> None:
             pass
 
 
+import re as _re
+
+# Track source URLs for downloaded files so transcription can attach them
+_downloaded_urls: dict = {}  # file_path -> source_url
+
+_YOUTUBE_VIDEO_ID_RE = _re.compile(
+    r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)"
+    r"([a-zA-Z0-9_-]{11})"
+)
+
+
+def _extract_youtube_id(url: str) -> str:
+    """Extract YouTube video ID from a URL. Returns empty string if not YouTube."""
+    if not url:
+        return ""
+    m = _YOUTUBE_VIDEO_ID_RE.search(url)
+    return m.group(1) if m else ""
+
+
+def _youtube_timestamp_link(source_url: str, seconds: float) -> str:
+    """Generate a YouTube URL with timestamp parameter. Returns empty string if not YouTube."""
+    video_id = _extract_youtube_id(source_url)
+    if not video_id:
+        return ""
+    return f"https://youtube.com/watch?v={video_id}&t={int(seconds)}"
+
+
 def _write_output_file(
     output_path: str,
     rows: list,
@@ -180,6 +207,7 @@ def _write_csv(path: str, rows: list, columns: list) -> None:
         "similarity": "Similarity",
         "source": "Source",
         "title": "Source",
+        "youtube_link": "YouTube Link",
     }
     writer.writerow([header_names.get(c, c.title()) for c in columns])
 
@@ -238,6 +266,7 @@ def _write_xlsx(
         "similarity": "Similarity",
         "source": "Source",
         "title": "Source",
+        "youtube_link": "YouTube Link",
     }
 
     # Write header row
@@ -890,6 +919,10 @@ def handle_download_audio(arguments: dict) -> dict:
             "size_mb": round(file_size / (1024 * 1024), 2),
         }
 
+    # Register source URL so transcription can attach it to memory
+    if output_file and os.path.exists(output_file):
+        _downloaded_urls[os.path.abspath(output_file)] = url
+
     return {
         "success": True,
         "url": url,
@@ -922,6 +955,22 @@ def handle_search_audio(arguments: dict) -> dict:
 
     result["model_used"] = model_size
 
+    # Look up source URL for YouTube timestamp linking
+    source_url = _downloaded_urls.get(os.path.abspath(audio_path), "")
+    if not source_url:
+        from .memory import get_transcription_memory
+
+        source_url = get_transcription_memory().get_source_url(audio_path, model_size)
+
+    # Add YouTube links to keyword matches
+    if source_url and _extract_youtube_id(source_url):
+        for _kw, matches in result.items():
+            if isinstance(matches, list):
+                for m in matches:
+                    secs = m.get("timestamp_seconds", 0)
+                    if secs:
+                        m["youtube_link"] = _youtube_timestamp_link(source_url, secs)
+
     # Write output file if requested
     if output:
         # Flatten grouped results into rows
@@ -929,19 +978,23 @@ def handle_search_audio(arguments: dict) -> dict:
         for kw, matches in result.items():
             if isinstance(matches, list):
                 for m in matches:
-                    rows.append(
-                        {
-                            "keyword": kw,
-                            "timestamp": m.get("timestamp", ""),
-                            "timestamp_seconds": m.get("timestamp_seconds", 0),
-                            "snippet": m.get("snippet", ""),
-                        }
-                    )
+                    row = {
+                        "keyword": kw,
+                        "timestamp": m.get("timestamp", ""),
+                        "timestamp_seconds": m.get("timestamp_seconds", 0),
+                        "snippet": m.get("snippet", ""),
+                    }
+                    if m.get("youtube_link"):
+                        row["youtube_link"] = m["youtube_link"]
+                    rows.append(row)
         if rows:
+            cols = ["keyword", "timestamp", "snippet"]
+            if any(r.get("youtube_link") for r in rows):
+                cols.append("youtube_link")
             result["output_path"] = _write_output_file(
                 output,
                 rows,
-                columns=["keyword", "timestamp", "snippet"],
+                columns=cols,
                 bold_columns=["keyword", "timestamp"],
             )
 
@@ -977,12 +1030,24 @@ def handle_transcribe_audio(arguments: dict) -> dict:
         subprocess.run(cmd, capture_output=True, check=True)
         audio_path = trimmed_path
 
+    # Resolve the original audio path (before trimming) for URL lookup
+    original_audio_path = arguments.get("audio_path")
+
     try:
         result = transcribe_audio(audio_path, model_size)
     finally:
         # Clean up temp file
         if trimmed_path and os.path.exists(trimmed_path):
             os.remove(trimmed_path)
+
+    # Attach source URL to memory if this file was downloaded via download_audio
+    source_url = _downloaded_urls.get(os.path.abspath(original_audio_path), "")
+    if source_url:
+        from .memory import get_transcription_memory
+
+        get_transcription_memory().update_source_url(
+            original_audio_path, model_size, source_url
+        )
 
     # Build per-segment timestamps
     segments = []
@@ -995,14 +1060,16 @@ def handle_transcribe_audio(arguments: dict) -> dict:
         if start:
             e += start
         minutes_s, secs_s = int(s // 60), int(s % 60)
-        segments.append(
-            {
-                "start": round(s, 1),
-                "end": round(e, 1),
-                "timestamp": f"{minutes_s}:{secs_s:02d}",
-                "text": seg["text"].strip(),
-            }
-        )
+        seg_dict = {
+            "start": round(s, 1),
+            "end": round(e, 1),
+            "timestamp": f"{minutes_s}:{secs_s:02d}",
+            "text": seg["text"].strip(),
+        }
+        yt_link = _youtube_timestamp_link(source_url, s)
+        if yt_link:
+            seg_dict["youtube_link"] = yt_link
+        segments.append(seg_dict)
 
     # Cap response size to prevent token overflow in Claude Code.
     # For large transcriptions, truncate text and suggest using output param.
@@ -1041,10 +1108,13 @@ def handle_transcribe_audio(arguments: dict) -> dict:
 
     # Write output file if requested
     if output:
+        cols = ["timestamp", "text"]
+        if any(s.get("youtube_link") for s in segments):
+            cols.append("youtube_link")
         response["output_path"] = _write_output_file(
             output,
             segments,
-            columns=["timestamp", "text"],
+            columns=cols,
             bold_columns=["timestamp"],
         )
 
@@ -1071,6 +1141,20 @@ def handle_search_proximity(arguments: dict) -> dict:
         audio_path, keyword1, keyword2, max_distance=max_distance, model_size=model_size
     )
 
+    # Add YouTube links if source is YouTube
+    source_url = _downloaded_urls.get(os.path.abspath(audio_path), "")
+    if not source_url:
+        from .memory import get_transcription_memory
+
+        source_url = get_transcription_memory().get_source_url(audio_path, model_size)
+
+    if source_url and _extract_youtube_id(source_url):
+        for m in matches:
+            secs = m.get("timestamp_seconds", 0)
+            yt_link = _youtube_timestamp_link(source_url, secs)
+            if yt_link:
+                m["youtube_link"] = yt_link
+
     result = {
         "query": f"'{keyword1}' within {max_distance} words of '{keyword2}'",
         "match_count": len(matches),
@@ -1080,10 +1164,13 @@ def handle_search_proximity(arguments: dict) -> dict:
 
     # Write output file if requested
     if output and matches:
+        cols = ["timestamp", "snippet"]
+        if any(m.get("youtube_link") for m in matches):
+            cols.append("youtube_link")
         result["output_path"] = _write_output_file(
             output,
             matches,
-            columns=["timestamp", "snippet"],
+            columns=cols,
             bold_columns=["timestamp"],
         )
 
@@ -1463,6 +1550,11 @@ def handle_take_notes(arguments: dict) -> dict:
     text = result["text"]
     duration = result["duration"]
 
+    # Attach source URL to memory
+    from .memory import get_transcription_memory
+
+    get_transcription_memory().update_source_url(audio_path, model_size, url)
+
     # Step 3: Save raw transcription as .txt on Desktop
     # Clean title for filename (remove special chars)
     safe_title = re.sub(r"[^\w\s\-]", "", title)
@@ -1573,7 +1665,7 @@ def handle_search_memory(arguments: dict) -> dict:
                 "Missing dependencies: sentence-transformers. "
                 "Install with: pip install sentence-transformers"
             ) from err
-        return search_memory(
+        result = search_memory(
             query,
             top_k=top_k,
             mode="semantic",
@@ -1584,7 +1676,18 @@ def handle_search_memory(arguments: dict) -> dict:
     else:
         from .embeddings import search_memory
 
-        return search_memory(query, top_k=top_k, mode="keyword", output=output)
+        result = search_memory(query, top_k=top_k, mode="keyword", output=output)
+
+    # Add YouTube timestamp links where source_url is YouTube
+    for r in result.get("results", []):
+        source_url = r.get("source_url", "")
+        if source_url and _extract_youtube_id(source_url):
+            secs = r.get("start", 0)
+            yt_link = _youtube_timestamp_link(source_url, secs)
+            if yt_link:
+                r["youtube_link"] = yt_link
+
+    return result
 
 
 def handle_deep_search(arguments: dict) -> dict:
@@ -1619,12 +1722,29 @@ def handle_deep_search(arguments: dict) -> dict:
         dedup_seconds=dedup_seconds,
     )
 
+    # Add YouTube links if source is YouTube
+    source_url = _downloaded_urls.get(os.path.abspath(audio_path), "")
+    if not source_url:
+        from .memory import get_transcription_memory
+
+        source_url = get_transcription_memory().get_source_url(audio_path, model_size)
+
+    if source_url and _extract_youtube_id(source_url):
+        for r in result.get("results", []):
+            secs = r.get("start", 0)
+            yt_link = _youtube_timestamp_link(source_url, secs)
+            if yt_link:
+                r["youtube_link"] = yt_link
+
     # Write output file if requested
     if output and result.get("results"):
+        cols = ["timestamp", "text", "similarity"]
+        if any(r.get("youtube_link") for r in result["results"]):
+            cols.append("youtube_link")
         result["output_path"] = _write_output_file(
             output,
             result["results"],
-            columns=["timestamp", "text", "similarity"],
+            columns=cols,
             bold_columns=["timestamp"],
         )
 

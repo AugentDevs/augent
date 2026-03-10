@@ -32,6 +32,7 @@ class MemorizedTranscription:
     created_at: float
     file_path: str  # Original file path (for reference)
     title: str = ""  # Derived from filename, for UX display
+    source_url: str = ""  # Original URL (YouTube, etc.) if downloaded
 
 
 class TranscriptionMemory:
@@ -76,8 +77,12 @@ class TranscriptionMemory:
                 ON transcriptions(audio_hash)
             """)
 
-            # Migration: add title and md_path columns for existing DBs
-            for column, col_type in [("title", "TEXT"), ("md_path", "TEXT")]:
+            # Migration: add columns for existing DBs
+            for column, col_type in [
+                ("title", "TEXT"),
+                ("md_path", "TEXT"),
+                ("source_url", "TEXT"),
+            ]:
                 try:
                     conn.execute(
                         f"ALTER TABLE transcriptions ADD COLUMN {column} {col_type} DEFAULT ''"
@@ -249,13 +254,20 @@ class TranscriptionMemory:
                         created_at=row["created_at"],
                         file_path=row["file_path"],
                         title=row["title"] if "title" in row.keys() else "",
+                        source_url=(
+                            row["source_url"] if "source_url" in row.keys() else ""
+                        ),
                     )
         except Exception:
             # Cache miss on any error
             return None
 
     def set(
-        self, file_path: str, model_size: str, transcription: Dict[str, Any]
+        self,
+        file_path: str,
+        model_size: str,
+        transcription: Dict[str, Any],
+        source_url: str = "",
     ) -> None:
         """
         Store transcription in memory.
@@ -279,8 +291,9 @@ class TranscriptionMemory:
                         """
                         INSERT OR REPLACE INTO transcriptions
                         (cache_key, audio_hash, model_size, language, duration,
-                         text, words, segments, created_at, file_path, title, md_path)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         text, words, segments, created_at, file_path, title, md_path,
+                         source_url)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             cache_key,
@@ -295,12 +308,45 @@ class TranscriptionMemory:
                             file_path,
                             title,
                             str(md_path) if md_path else "",
+                            source_url,
                         ),
                     )
                     conn.commit()
         except Exception:
             # Silently fail on memory write errors
             pass
+
+    def update_source_url(
+        self, file_path: str, model_size: str, source_url: str
+    ) -> None:
+        """Attach a source URL to an existing transcription entry."""
+        try:
+            audio_hash = self.hash_audio_file(file_path)
+            cache_key = self._cache_key(audio_hash, model_size)
+            with self._lock:
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute(
+                        "UPDATE transcriptions SET source_url = ? WHERE cache_key = ?",
+                        (source_url, cache_key),
+                    )
+                    conn.commit()
+        except Exception:
+            pass
+
+    def get_source_url(self, file_path: str, model_size: str) -> str:
+        """Get the source URL for a transcription, if any."""
+        try:
+            audio_hash = self.hash_audio_file(file_path)
+            cache_key = self._cache_key(audio_hash, model_size)
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT source_url FROM transcriptions WHERE cache_key = ?",
+                    (cache_key,),
+                )
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else ""
+        except Exception:
+            return ""
 
     def clear(self) -> int:
         """
@@ -417,6 +463,11 @@ class TranscriptionMemory:
                                 created_at=row["created_at"],
                                 file_path=row["file_path"],
                                 title=row["title"] if "title" in row.keys() else "",
+                                source_url=(
+                                    row["source_url"]
+                                    if "source_url" in row.keys()
+                                    else ""
+                                ),
                             )
                         )
         except Exception:
@@ -435,7 +486,7 @@ class TranscriptionMemory:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
-                    "SELECT title, duration, created_at, model_size, md_path, file_path "
+                    "SELECT title, duration, created_at, model_size, md_path, file_path, source_url "
                     "FROM transcriptions ORDER BY created_at DESC"
                 )
                 for row in cursor.fetchall():
@@ -460,6 +511,7 @@ class TranscriptionMemory:
                             "model_size": row["model_size"],
                             "md_path": row["md_path"] or "",
                             "file_path": row["file_path"] or "",
+                            "source_url": row["source_url"] or "",
                         }
                     )
         except Exception:
@@ -550,7 +602,8 @@ class TranscriptionMemory:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
-                    SELECT audio_hash, title, file_path, duration, segments
+                    SELECT audio_hash, title, file_path, duration, segments,
+                           source_url
                     FROM transcriptions
                     GROUP BY audio_hash
                 """)
@@ -565,6 +618,7 @@ class TranscriptionMemory:
                             "segments": (
                                 json.loads(row["segments"]) if row["segments"] else []
                             ),
+                            "source_url": row["source_url"] or "",
                         }
                     )
         except Exception:
@@ -595,6 +649,7 @@ class TranscriptionMemory:
                 cursor = conn.execute(
                     """
                     SELECT t.audio_hash, t.title, t.file_path, t.duration, t.segments,
+                           t.source_url,
                            e.embeddings AS emb_blob, e.segment_count, e.embedding_dim
                     FROM transcriptions t
                     LEFT JOIN embeddings e
@@ -623,6 +678,7 @@ class TranscriptionMemory:
                             "segments": (
                                 json.loads(row["segments"]) if row["segments"] else []
                             ),
+                            "source_url": row["source_url"] or "",
                             "embeddings": emb,
                             "segment_count": seg_count or 0,
                             "embedding_dim": emb_dim or 0,
