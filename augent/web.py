@@ -1822,8 +1822,8 @@ async def api_memory_reveal(cache_key: str):
             subprocess.Popen(["xdg-open", os.path.dirname(file_path)])
         else:
             subprocess.Popen(["explorer", "/select,", file_path])
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    except Exception:
+        return JSONResponse({"error": "Could not open file manager"}, status_code=500)
 
     return JSONResponse({"ok": True, "file_path": file_path})
 
