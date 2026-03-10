@@ -1929,16 +1929,17 @@ h1{{font-size:24px;font-weight:700;margin-bottom:12px;letter-spacing:-0.3px}}
 
 
 def _kill_port(port: int):
-    """Kill any process using the specified port."""
+    """Kill any process using the specified port (excluding ourselves)."""
     import signal
 
+    my_pid = os.getpid()
     try:
         result = subprocess.run(
             ["lsof", "-ti", f":{port}"], capture_output=True, text=True
         )
         pids = result.stdout.strip().split("\n")
         for pid in pids:
-            if pid:
+            if pid and int(pid) != my_pid:
                 try:
                     os.kill(int(pid), signal.SIGKILL)
                 except (ProcessLookupError, ValueError):
@@ -1962,7 +1963,9 @@ def main():
 
     _time.sleep(0.5)
 
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    os.write(1, f"\n  WebUI is live at http://localhost:{args.port}\n  Press Ctrl+C to stop.\n\n".encode())
+
+    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":
