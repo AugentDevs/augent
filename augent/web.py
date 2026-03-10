@@ -62,8 +62,8 @@ HTML_PAGE = """<!DOCTYPE html>
 :root {
     --green: #00F060;
     --green-secondary: #00A86B;
-    --green-dim: rgba(0, 240, 96, 0.4);
-    --green-hint: rgba(0, 240, 96, 0.25);
+    --green-dim: rgba(0, 240, 96, 0.6);
+    --green-hint: rgba(0, 240, 96, 0.4);
     --green-hover: rgba(0, 240, 96, 0.08);
     --green-border: rgba(0, 240, 96, 0.15);
     --green-border-hover: rgba(0, 240, 96, 0.35);
@@ -374,13 +374,16 @@ select option {
 .tab-panel.active {
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
 }
 
 /* Results table */
 .results-content {
     flex: 1;
     overflow-y: auto;
-    padding: 4px;
+    padding: 12px;
+    border: 1px solid var(--green-border);
+    border-radius: 12px;
 }
 
 .results-content h3 {
@@ -615,10 +618,10 @@ function setFile(file) {
     wavesurfer = WaveSurfer.create({
         container: '#waveform',
         height: 48,
-        waveColor: 'rgba(0, 240, 96, 0.25)',
+        waveColor: '#1a1a1a',
         progressColor: '#00F060',
         cursorColor: '#00F060',
-        cursorWidth: 1,
+        cursorWidth: 2,
         barWidth: 2,
         barGap: 1,
         barRadius: 2,
@@ -811,7 +814,9 @@ async def search_audio(
 
         # Save uploaded file to temp
         suffix = Path(file.filename).suffix or ".tmp"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=suffix, dir="/tmp"
+        ) as tmp:
             content = await file.read()
             tmp.write(content)
             tmp_path = tmp.name
