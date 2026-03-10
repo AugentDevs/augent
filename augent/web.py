@@ -415,6 +415,7 @@ select option { background:var(--black); color:var(--green); }
     overflow: hidden;
     text-overflow: ellipsis;
     margin-bottom: 6px;
+    padding-right: 28px;
 }
 .memory-card .card-meta {
     display: flex;
