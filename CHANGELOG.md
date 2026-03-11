@@ -4,6 +4,34 @@ All notable changes to Augent are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.3.11] - 2026-03-11
+
+### Added
+
+- **Web UI waveform for URL downloads:** downloading audio from a URL now renders an interactive waveform with full playback controls (play/pause, skip to start/end, volume slider) — same experience as file uploads
+- **Web UI download spinner:** animated wormhole spinner replaces the progress bar during audio downloads for a cleaner look
+- **Web UI transcription progress bar:** real-time progress bar shown in the results panel during transcription
+- **Web UI Show in Finder button:** folder icon on memory cards to reveal the audio file (or `.md` fallback) in Finder
+- **Web UI URL-based memory caching:** pasting the same URL again skips re-downloading — instant cache hit by source URL + model size
+
+### Changed
+
+- **Web UI memory stats:** transcription count and placeholder text are now larger and use the green accent color for better readability
+- **Web UI keyword placeholder:** updated to "wormhole, open source, workflow"
+- **Web UI progress/spinner location:** moved from the log box to the results panel where it's more visible
+
+### Fixed
+
+- **`augent-web` startup:** server no longer silently exits on launch; prints a clean "WebUI is live at" message
+- **`_kill_port` killing own process:** added PID check so the server doesn't terminate itself on startup
+- **Memory not saving from Web UI downloads:** macOS `tempfile.mkdtemp()` created dirs in `/var/folders/` which failed the `/tmp` security check — now forces `/tmp` as the base directory
+- **Memory card title overlapping trash icon:** added padding so long titles no longer clip behind the delete button
+- **Memory list clipping at bottom:** added bottom padding so the last card isn't cut off by the panel edge
+- **Audio endpoint 404 on macOS:** resolved `/tmp` → `/private/tmp` symlink issue and URL-encoded audio paths
+- **CI build failure:** fixed black formatting issues
+
+---
+
 ## [2026.3.10] - 2026-03-10
 
 ### Added
