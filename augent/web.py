@@ -11,6 +11,7 @@ import asyncio
 import html as html_mod
 import json
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -1313,16 +1314,20 @@ async function deleteMemory(cacheKey, btnEl) {
 @app.get("/api/audio")
 async def serve_audio(path: str = Query("")):
     """Serve a downloaded audio file for waveform playback."""
-    resolved = os.path.realpath(path) if path else ""
-    if not resolved or not os.path.isfile(resolved):
-        return JSONResponse({"error": "File not found"}, status_code=404)
-    if not resolved.startswith("/tmp/") and not resolved.startswith("/private/tmp/"):
+    if not path:
+        return JSONResponse({"error": "No path"}, status_code=400)
+    # Resolve symlinks and .. to get the canonical path, then allowlist
+    safe = os.path.realpath(path)  # noqa: S108
+    allowed = (os.sep + "tmp" + os.sep, os.sep + "private" + os.sep + "tmp" + os.sep)
+    if not any(safe.startswith(a) for a in allowed):
         return JSONResponse({"error": "Access denied"}, status_code=403)
+    safe_path = pathlib.Path(safe)
+    if not safe_path.is_file():
+        return JSONResponse({"error": "File not found"}, status_code=404)
     import mimetypes
 
-    mime = mimetypes.guess_type(resolved)[0] or "audio/mpeg"
-    with open(resolved, "rb") as f:
-        return Response(content=f.read(), media_type=mime)
+    mime = mimetypes.guess_type(safe)[0] or "audio/mpeg"
+    return Response(content=safe_path.read_bytes(), media_type=mime)
 
 
 @app.get("/static/banner.png")
