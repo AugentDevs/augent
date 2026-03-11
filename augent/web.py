@@ -1311,23 +1311,28 @@ async function deleteMemory(cacheKey, btnEl) {
 # ---------------------------------------------------------------------------
 
 
+_audio_tokens: dict[str, str] = {}
+
+
+def _register_audio(file_path: str) -> str:
+    """Store a file path server-side and return an opaque token."""
+    import secrets
+
+    token = secrets.token_urlsafe(16)
+    _audio_tokens[token] = os.path.realpath(file_path)
+    return token
+
+
 @app.get("/api/audio")
-async def serve_audio(path: str = Query("")):
-    """Serve a downloaded audio file for waveform playback."""
-    if not path:
-        return JSONResponse({"error": "No path"}, status_code=400)
-    # Resolve symlinks and .. to get the canonical path, then allowlist
-    safe = os.path.realpath(path)  # noqa: S108
-    allowed = (os.sep + "tmp" + os.sep, os.sep + "private" + os.sep + "tmp" + os.sep)
-    if not any(safe.startswith(a) for a in allowed):
-        return JSONResponse({"error": "Access denied"}, status_code=403)
-    safe_path = pathlib.Path(safe)
-    if not safe_path.is_file():
+async def serve_audio(token: str = Query("")):
+    """Serve a downloaded audio file by opaque token (no user-controlled paths)."""
+    file_path = _audio_tokens.get(token, "")
+    if not file_path or not pathlib.Path(file_path).is_file():
         return JSONResponse({"error": "File not found"}, status_code=404)
     import mimetypes
 
-    mime = mimetypes.guess_type(safe)[0] or "audio/mpeg"
-    return Response(content=safe_path.read_bytes(), media_type=mime)
+    mime = mimetypes.guess_type(file_path)[0] or "audio/mpeg"
+    return Response(content=pathlib.Path(file_path).read_bytes(), media_type=mime)
 
 
 @app.get("/static/banner.png")
@@ -1648,11 +1653,10 @@ async def download_and_search(request: Request):
             yield send(
                 "log", text=f"  [download] complete: {os.path.basename(audio_path)}"
             )
-            from urllib.parse import quote
-
+            audio_token = _register_audio(audio_path)
             yield send(
                 "audio_url",
-                url=f"/api/audio?path={quote(audio_path, safe='')}",
+                url=f"/api/audio?token={audio_token}",
             )
             yield send("log", text="")
 
