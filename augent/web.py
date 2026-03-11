@@ -238,18 +238,29 @@ select option { background:var(--black); color:var(--green); }
 }
 
 /* WaveSurfer */
-.waveform-wrap { display:none; margin-top:10px; border:1px solid var(--green-border); border-radius:12px; padding:8px; cursor:pointer; }
+.waveform-wrap { display:none; margin-top:10px; border:1px solid var(--green-border); border-radius:12px; padding:10px 12px; }
 .waveform-wrap.visible { display:block; }
-#waveform { width:100%; height:48px; }
-.wave-controls { display:flex; align-items:center; gap:10px; margin-top:6px; padding:0 2px; }
-.wave-time { font-family:var(--mono); font-size:11px; color:var(--green); }
-.play-btn {
+#waveform { width:100%; height:48px; cursor:pointer; }
+.wave-controls { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.wave-btn {
     background:none; border:1px solid var(--green-border); color:var(--green);
     width:28px; height:28px; border-radius:50%; cursor:pointer;
     display:flex; align-items:center; justify-content:center; font-size:11px;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s; flex-shrink:0;
 }
-.play-btn:hover { border-color:var(--green-border-hover); background:var(--green-hover); }
+.wave-btn:hover { border-color:var(--green-border-hover); background:var(--green-hover); }
+.wave-btn svg { width:12px; height:12px; }
+.wave-time { font-family:var(--mono); font-size:11px; color:var(--green); }
+.wave-volume { display:flex; align-items:center; gap:6px; margin-left:auto; }
+.wave-volume input[type="range"] {
+    -webkit-appearance:none; appearance:none; width:70px; height:3px;
+    background:var(--green-border); border-radius:2px; outline:none; cursor:pointer;
+}
+.wave-volume input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:10px; height:10px; border-radius:50%;
+    background:var(--green); cursor:pointer;
+}
+.wave-volume svg { width:14px; height:14px; color:var(--green); flex-shrink:0; }
 
 /* Search button */
 .search-btn {
@@ -675,8 +686,18 @@ select option { background:var(--black); color:var(--green); }
             <div class="waveform-wrap" id="waveformWrap">
                 <div id="waveform"></div>
                 <div class="wave-controls">
-                    <button class="play-btn" id="playBtn" onclick="togglePlay()">&#9654;</button>
+                    <button class="wave-btn" id="skipStartBtn" onclick="waveSkipStart()" title="Back to start">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="19 20 9 12 19 4"/><line x1="5" y1="4" x2="5" y2="20"/></svg>
+                    </button>
+                    <button class="wave-btn" id="playBtn" onclick="togglePlay()" title="Play / Pause">&#9654;</button>
+                    <button class="wave-btn" id="skipEndBtn" onclick="waveSkipEnd()" title="Skip to end">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 4 15 12 5 20"/><line x1="19" y1="4" x2="19" y2="20"/></svg>
+                    </button>
                     <span class="wave-time" id="waveTime">0:00 / 0:00</span>
+                    <div class="wave-volume">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                        <input type="range" id="volumeSlider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+                    </div>
                 </div>
             </div>
         </div>
@@ -819,7 +840,10 @@ function setFile(file) {
     uploadLabel.textContent = file.name;
     uploadZone.classList.add('has-file');
     document.getElementById('audioUrl').value = '';
+    loadWaveform(URL.createObjectURL(file));
+}
 
+function loadWaveform(url) {
     if (wavesurfer) { wavesurfer.destroy(); wavesurfer = null; }
     waveformWrap.classList.add('visible');
 
@@ -831,8 +855,8 @@ function setFile(file) {
         normalize: true, backend: 'WebAudio',
     });
 
-    const url = URL.createObjectURL(file);
     wavesurfer.load(url);
+    wavesurfer.setVolume(document.getElementById('volumeSlider').value / 100);
 
     const timeEl = document.getElementById('waveTime');
     const playBtn = document.getElementById('playBtn');
@@ -852,6 +876,9 @@ function setFile(file) {
 }
 
 function togglePlay() { if (wavesurfer) wavesurfer.playPause(); }
+function waveSkipStart() { if (wavesurfer) wavesurfer.seekTo(0); }
+function waveSkipEnd() { if (wavesurfer) wavesurfer.seekTo(1); }
+function setVolume(val) { if (wavesurfer) wavesurfer.setVolume(val / 100); }
 
 function switchTab(name, btn) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -916,6 +943,7 @@ async function startSearch() {
                         else if (data.type === 'status') resultsContent.innerHTML = '<p>' + data.text + '</p>';
                         else if (data.type === 'progress') showProgress(data.pct, data.label);
                         else if (data.type === 'spinner') showSpinner(data.label);
+                        else if (data.type === 'audio_url') loadWaveform(data.url);
                         else if (data.type === 'results') {
                             hideProgress(); hideSpinner();
                             lastGrouped = data.grouped;
@@ -1282,6 +1310,21 @@ async function deleteMemory(cacheKey, btnEl) {
 # ---------------------------------------------------------------------------
 
 
+@app.get("/api/audio")
+async def serve_audio(path: str = Query("")):
+    """Serve a downloaded audio file for waveform playback."""
+    if not path or not os.path.isfile(path):
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    resolved = os.path.realpath(path)
+    if not resolved.startswith("/tmp/"):
+        return JSONResponse({"error": "Access denied"}, status_code=403)
+    import mimetypes
+
+    mime = mimetypes.guess_type(resolved)[0] or "audio/mpeg"
+    with open(resolved, "rb") as f:
+        return Response(content=f.read(), media_type=mime)
+
+
 @app.get("/static/banner.png")
 async def serve_banner():
     banner_path = os.path.join(os.path.dirname(__file__), "augentbanner.png")
@@ -1599,6 +1642,10 @@ async def download_and_search(request: Request):
 
             yield send(
                 "log", text=f"  [download] complete: {os.path.basename(audio_path)}"
+            )
+            yield send(
+                "audio_url",
+                url=f"/api/audio?path={audio_path}",
             )
             yield send("log", text="")
 
@@ -2019,7 +2066,9 @@ async def api_memory_reveal(cache_key: str):
                 except Exception:
                     pass
                 return JSONResponse(
-                    {"error": f"File no longer exists — opened folder instead: {parent}"},
+                    {
+                        "error": f"File no longer exists — opened folder instead: {parent}"
+                    },
                     status_code=404,
                 )
             return JSONResponse(
@@ -2180,7 +2229,10 @@ def main():
 
     _time.sleep(0.5)
 
-    os.write(1, f"\n  WebUI is live at http://localhost:{args.port}\n  Press Ctrl+C to stop.\n\n".encode())
+    os.write(
+        1,
+        f"\n  WebUI is live at http://localhost:{args.port}\n  Press Ctrl+C to stop.\n\n".encode(),
+    )
 
     uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
 
