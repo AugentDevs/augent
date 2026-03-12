@@ -34,9 +34,7 @@ class TestDownloadAudio:
     def _mock_run(self, stdout="", returncode=0):
         return mock.patch(
             "subprocess.run",
-            return_value=mock.Mock(
-                stdout=stdout, stderr="", returncode=returncode
-            ),
+            return_value=mock.Mock(stdout=stdout, stderr="", returncode=returncode),
         )
 
     def test_missing_url_raises(self):
@@ -51,7 +49,9 @@ class TestDownloadAudio:
 
             with self._mock_run(stdout=fake_file) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_download_audio({"url": "https://youtube.com/watch?v=abc", "output_dir": tmpdir})
+                    handle_download_audio(
+                        {"url": "https://youtube.com/watch?v=abc", "output_dir": tmpdir}
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 assert "--restrict-filenames" in cmd
@@ -64,7 +64,9 @@ class TestDownloadAudio:
 
             with self._mock_run(stdout=fake_file) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_download_audio({"url": "https://example.com/video", "output_dir": tmpdir})
+                    handle_download_audio(
+                        {"url": "https://example.com/video", "output_dir": tmpdir}
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 o_idx = cmd.index("-o")
@@ -79,8 +81,12 @@ class TestDownloadAudio:
             open(fake_file, "w").close()
 
             with self._mock_run(stdout=fake_file) as mock_run:
-                with mock.patch("shutil.which", side_effect=lambda name, **kw: "/usr/bin/" + name):
-                    handle_download_audio({"url": "https://example.com/v", "output_dir": tmpdir})
+                with mock.patch(
+                    "shutil.which", side_effect=lambda name, **kw: "/usr/bin/" + name
+                ):
+                    handle_download_audio(
+                        {"url": "https://example.com/v", "output_dir": tmpdir}
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 assert "--downloader" in cmd
@@ -99,7 +105,9 @@ class TestDownloadAudio:
 
             with self._mock_run(stdout=fake_file) as mock_run:
                 with mock.patch("shutil.which", side_effect=which_side_effect):
-                    handle_download_audio({"url": "https://example.com/v", "output_dir": tmpdir})
+                    handle_download_audio(
+                        {"url": "https://example.com/v", "output_dir": tmpdir}
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 assert "--downloader" not in cmd
@@ -114,7 +122,9 @@ class TestDownloadAudio:
             with self._mock_run(stdout="", returncode=1):
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
                     with pytest.raises(RuntimeError, match="Download failed"):
-                        handle_download_audio({"url": "https://example.com/v", "output_dir": tmpdir})
+                        handle_download_audio(
+                            {"url": "https://example.com/v", "output_dir": tmpdir}
+                        )
 
     def test_registers_source_url(self):
         """Downloaded file should be tracked in _downloaded_urls."""
@@ -126,10 +136,17 @@ class TestDownloadAudio:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
                     with mock.patch.dict("augent.mcp._downloaded_urls", {}, clear=True):
                         from augent import mcp
+
                         handle_download_audio(
-                            {"url": "https://youtube.com/watch?v=test123", "output_dir": tmpdir}
+                            {
+                                "url": "https://youtube.com/watch?v=test123",
+                                "output_dir": tmpdir,
+                            }
                         )
-                        assert mcp._downloaded_urls[os.path.abspath(fake_file)] == "https://youtube.com/watch?v=test123"
+                        assert (
+                            mcp._downloaded_urls[os.path.abspath(fake_file)]
+                            == "https://youtube.com/watch?v=test123"
+                        )
 
     def test_success_response_shape(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -139,7 +156,9 @@ class TestDownloadAudio:
 
             with self._mock_run(stdout=fake_file):
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    result = handle_download_audio({"url": "https://example.com/v", "output_dir": tmpdir})
+                    result = handle_download_audio(
+                        {"url": "https://example.com/v", "output_dir": tmpdir}
+                    )
 
             assert result["success"] is True
             assert result["file"]["path"] == fake_file
@@ -154,7 +173,9 @@ class TestDownloadAudio:
 
             with self._mock_run(stdout=fake_file) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_download_audio({"url": "https://example.com/v", "output_dir": tmpdir})
+                    handle_download_audio(
+                        {"url": "https://example.com/v", "output_dir": tmpdir}
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 idx = cmd.index("--concurrent-fragments")
@@ -172,9 +193,7 @@ class TestClipExport:
     def _mock_run(self, stdout="", returncode=0):
         return mock.patch(
             "subprocess.run",
-            return_value=mock.Mock(
-                stdout=stdout, stderr="", returncode=returncode
-            ),
+            return_value=mock.Mock(stdout=stdout, stderr="", returncode=returncode),
         )
 
     def test_missing_url_raises(self):
@@ -182,7 +201,9 @@ class TestClipExport:
             handle_clip_export({"start": 0, "end": 10})
 
     def test_missing_start_end_raises(self):
-        with pytest.raises(ValueError, match="Missing required parameters: start and end"):
+        with pytest.raises(
+            ValueError, match="Missing required parameters: start and end"
+        ):
             handle_clip_export({"url": "https://example.com/v"})
 
     def test_end_before_start_raises(self):
@@ -198,13 +219,15 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_clip_export({
-                        "url": "https://example.com/v",
-                        "start": 10,
-                        "end": 30,
-                        "output_dir": tmpdir,
-                        "output_filename": "clip",
-                    })
+                    handle_clip_export(
+                        {
+                            "url": "https://example.com/v",
+                            "start": 10,
+                            "end": 30,
+                            "output_dir": tmpdir,
+                            "output_filename": "clip",
+                        }
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 assert "--force-overwrites" in cmd
@@ -217,12 +240,14 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_clip_export({
-                        "url": "https://example.com/v",
-                        "start": 0,
-                        "end": 10,
-                        "output_dir": tmpdir,
-                    })
+                    handle_clip_export(
+                        {
+                            "url": "https://example.com/v",
+                            "start": 0,
+                            "end": 10,
+                            "output_dir": tmpdir,
+                        }
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 assert "--force-keyframes-at-cuts" in cmd
@@ -236,12 +261,14 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_clip_export({
-                        "url": "https://example.com/v",
-                        "start": 65,  # 1:05
-                        "end": 130,   # 2:10
-                        "output_dir": tmpdir,
-                    })
+                    handle_clip_export(
+                        {
+                            "url": "https://example.com/v",
+                            "start": 65,  # 1:05
+                            "end": 130,  # 2:10
+                            "output_dir": tmpdir,
+                        }
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 idx = cmd.index("--download-sections")
@@ -255,13 +282,15 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_clip_export({
-                        "url": "https://example.com/v",
-                        "start": 0,
-                        "end": 10,
-                        "output_dir": tmpdir,
-                        "output_filename": "my_clip",
-                    })
+                    handle_clip_export(
+                        {
+                            "url": "https://example.com/v",
+                            "start": 0,
+                            "end": 10,
+                            "output_dir": tmpdir,
+                            "output_filename": "my_clip",
+                        }
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 o_idx = cmd.index("-o")
@@ -275,12 +304,14 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_clip_export({
-                        "url": "https://example.com/v",
-                        "start": 0,
-                        "end": 10,
-                        "output_dir": tmpdir,
-                    })
+                    handle_clip_export(
+                        {
+                            "url": "https://example.com/v",
+                            "start": 0,
+                            "end": 10,
+                            "output_dir": tmpdir,
+                        }
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 o_idx = cmd.index("-o")
@@ -291,19 +322,23 @@ class TestClipExport:
     def test_yt_dlp_not_found_raises(self):
         with mock.patch("shutil.which", return_value=None):
             with pytest.raises(FileNotFoundError, match="yt-dlp not found"):
-                handle_clip_export({"url": "https://example.com/v", "start": 0, "end": 10})
+                handle_clip_export(
+                    {"url": "https://example.com/v", "start": 0, "end": 10}
+                )
 
     def test_yt_dlp_failure_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with self._mock_run(stdout="", returncode=1):
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
                     with pytest.raises(RuntimeError, match="yt-dlp clip export failed"):
-                        handle_clip_export({
-                            "url": "https://example.com/v",
-                            "start": 0,
-                            "end": 10,
-                            "output_dir": tmpdir,
-                        })
+                        handle_clip_export(
+                            {
+                                "url": "https://example.com/v",
+                                "start": 0,
+                                "end": 10,
+                                "output_dir": tmpdir,
+                            }
+                        )
 
     def test_response_shape(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -313,12 +348,14 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip):
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    result = handle_clip_export({
-                        "url": "https://youtube.com/watch?v=abc",
-                        "start": 50,
-                        "end": 80,
-                        "output_dir": tmpdir,
-                    })
+                    result = handle_clip_export(
+                        {
+                            "url": "https://youtube.com/watch?v=abc",
+                            "start": 50,
+                            "end": 80,
+                            "output_dir": tmpdir,
+                        }
+                    )
 
             assert result["clip_path"] == fake_clip
             assert result["start"] == 50
@@ -338,12 +375,14 @@ class TestClipExport:
 
             with self._mock_run(stdout=fake_clip) as mock_run:
                 with mock.patch("shutil.which", return_value="/usr/bin/yt-dlp"):
-                    handle_clip_export({
-                        "url": "https://example.com/v",
-                        "start": 0,
-                        "end": 10,
-                        "output_dir": tmpdir,
-                    })
+                    handle_clip_export(
+                        {
+                            "url": "https://example.com/v",
+                            "start": 0,
+                            "end": 10,
+                            "output_dir": tmpdir,
+                        }
+                    )
 
                 cmd = mock_run.call_args[0][0]
                 idx = cmd.index("--merge-output-format")
@@ -361,6 +400,7 @@ class TestExportClipsForMatches:
     def test_default_padding_is_15(self):
         """Default padding should be 15 seconds."""
         import inspect
+
         sig = inspect.signature(_export_clips_for_matches)
         assert sig.parameters["padding"].default == 15
 
@@ -375,7 +415,7 @@ class TestExportClipsForMatches:
 
         call_args = mock_clip.call_args[0][0]
         assert call_args["start"] == 45.0  # 60 - 15
-        assert call_args["end"] == 75.0    # 60 + 15
+        assert call_args["end"] == 75.0  # 60 + 15
 
     @mock.patch("augent.mcp.handle_clip_export")
     def test_start_clamped_to_zero(self, mock_clip):
@@ -397,8 +437,8 @@ class TestExportClipsForMatches:
         # Should be ONE clip call, not two
         assert mock_clip.call_count == 1
         call_args = mock_clip.call_args[0][0]
-        assert call_args["start"] == 35.0   # 50 - 15
-        assert call_args["end"] == 75.0     # 60 + 15
+        assert call_args["start"] == 35.0  # 50 - 15
+        assert call_args["end"] == 75.0  # 60 + 15
 
     @mock.patch("augent.mcp.handle_clip_export")
     def test_non_overlapping_ranges_separate(self, mock_clip):
@@ -413,7 +453,9 @@ class TestExportClipsForMatches:
     def test_match_timestamps_attached(self, mock_clip):
         mock_clip.return_value = {"clip_path": "/tmp/clip.mp4"}
 
-        result = _export_clips_for_matches("https://example.com", [50.0, 55.0], padding=15)
+        result = _export_clips_for_matches(
+            "https://example.com", [50.0, 55.0], padding=15
+        )
 
         assert result[0]["match_timestamps"] == [50.0, 55.0]
 
@@ -491,11 +533,13 @@ class TestTranscribeAudio:
                 "cached": False,
             }
 
-            handle_transcribe_audio({
-                "audio_path": audio_path,
-                "start": 120,
-                "duration": 60,
-            })
+            handle_transcribe_audio(
+                {
+                    "audio_path": audio_path,
+                    "start": 120,
+                    "duration": 60,
+                }
+            )
 
             # ffmpeg should have been called with -ss and -t
             ffmpeg_cmd = mock_run.call_args[0][0]
@@ -516,10 +560,12 @@ class TestTranscribeAudio:
             mock_memory.store_translation.return_value = "/fake/path/translation.md"
             mock_mem_fn.return_value = mock_memory
 
-            result = handle_transcribe_audio({
-                "audio_path": "/fake/audio.webm",
-                "translated_text": "This is the English translation.",
-            })
+            result = handle_transcribe_audio(
+                {
+                    "audio_path": "/fake/audio.webm",
+                    "translated_text": "This is the English translation.",
+                }
+            )
 
             assert result["status"] == "translation_stored"
             mock_memory.store_translation.assert_called_once()
@@ -532,10 +578,12 @@ class TestTranscribeAudio:
             mock_mem_fn.return_value = mock_memory
 
             with pytest.raises(ValueError, match="No existing transcription"):
-                handle_transcribe_audio({
-                    "audio_path": "/fake/audio.webm",
-                    "translated_text": "English text",
-                })
+                handle_transcribe_audio(
+                    {
+                        "audio_path": "/fake/audio.webm",
+                        "translated_text": "English text",
+                    }
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -660,10 +708,12 @@ class TestBatchSearch:
             path2 = f2.name
 
         try:
-            result = handle_batch_search({
-                "audio_paths": [path1, path2],
-                "keywords": ["test"],
-            })
+            result = handle_batch_search(
+                {
+                    "audio_paths": [path1, path2],
+                    "keywords": ["test"],
+                }
+            )
 
             assert result["files_processed"] == 2
             assert result["files_with_errors"] == 0
@@ -674,10 +724,12 @@ class TestBatchSearch:
 
     def test_nonexistent_files_reported(self):
         with mock.patch("augent.mcp.search_audio"):
-            result = handle_batch_search({
-                "audio_paths": ["/nonexistent/file1.mp3", "/nonexistent/file2.mp3"],
-                "keywords": ["test"],
-            })
+            result = handle_batch_search(
+                {
+                    "audio_paths": ["/nonexistent/file1.mp3", "/nonexistent/file2.mp3"],
+                    "keywords": ["test"],
+                }
+            )
 
             assert result["files_processed"] == 0
             assert result["files_with_errors"] == 2
@@ -691,10 +743,12 @@ class TestBatchSearch:
             valid_path = f.name
 
         try:
-            result = handle_batch_search({
-                "audio_paths": [valid_path, "/nonexistent.mp3"],
-                "keywords": ["kw"],
-            })
+            result = handle_batch_search(
+                {
+                    "audio_paths": [valid_path, "/nonexistent.mp3"],
+                    "keywords": ["kw"],
+                }
+            )
 
             assert result["files_processed"] == 1
             assert result["files_with_errors"] == 1
@@ -712,10 +766,12 @@ class TestBatchSearch:
             path = f.name
 
         try:
-            result = handle_batch_search({
-                "audio_paths": [path],
-                "keywords": ["word1", "word2"],
-            })
+            result = handle_batch_search(
+                {
+                    "audio_paths": [path],
+                    "keywords": ["word1", "word2"],
+                }
+            )
 
             assert result["total_matches"] == 3
         finally:
@@ -729,11 +785,13 @@ class TestBatchSearch:
             path = f.name
 
         try:
-            result = handle_batch_search({
-                "audio_paths": [path],
-                "keywords": ["kw"],
-                "workers": 4,
-            })
+            result = handle_batch_search(
+                {
+                    "audio_paths": [path],
+                    "keywords": ["kw"],
+                    "workers": 4,
+                }
+            )
 
             assert result["model_used"] == "tiny"
         finally:
@@ -748,10 +806,12 @@ class TestBatchSearch:
             path = f.name
 
         try:
-            result = handle_batch_search({
-                "audio_paths": [path],
-                "keywords": ["kw"],
-            })
+            result = handle_batch_search(
+                {
+                    "audio_paths": [path],
+                    "keywords": ["kw"],
+                }
+            )
 
             assert result["files_processed"] == 1
             assert "error" in result["results"][path]
@@ -838,7 +898,9 @@ class TestSeparateAudio:
         try:
             handle_separate_audio({"audio_path": path, "model": "htdemucs_ft"})
 
-            mock_sep.assert_called_once_with(path, model="htdemucs_ft", two_stems="vocals")
+            mock_sep.assert_called_once_with(
+                path, model="htdemucs_ft", two_stems="vocals"
+            )
         finally:
             os.unlink(path)
 
@@ -910,13 +972,17 @@ class TestClipPaddingDefaults:
             with mock.patch("augent.mcp._export_clips_for_matches") as mock_clips:
                 mock_clips.return_value = []
 
-                with mock.patch.dict("augent.mcp._downloaded_urls", {"/fake": "https://example.com"}):
+                with mock.patch.dict(
+                    "augent.mcp._downloaded_urls", {"/fake": "https://example.com"}
+                ):
                     with mock.patch("os.path.abspath", return_value="/fake"):
-                        handle_search_audio({
-                            "audio_path": "/fake.mp3",
-                            "keywords": ["kw"],
-                            "clip": True,
-                        })
+                        handle_search_audio(
+                            {
+                                "audio_path": "/fake.mp3",
+                                "keywords": ["kw"],
+                                "clip": True,
+                            }
+                        )
 
                         mock_clips.assert_called_once()
                         assert mock_clips.call_args[1]["padding"] == 15
@@ -933,13 +999,17 @@ class TestClipPaddingDefaults:
             with mock.patch("augent.mcp._export_clips_for_matches") as mock_clips:
                 mock_clips.return_value = []
 
-                with mock.patch.dict("augent.mcp._downloaded_urls", {"/fake": "https://example.com"}):
+                with mock.patch.dict(
+                    "augent.mcp._downloaded_urls", {"/fake": "https://example.com"}
+                ):
                     with mock.patch("os.path.abspath", return_value="/fake"):
-                        handle_search_audio({
-                            "audio_path": "/fake.mp3",
-                            "keywords": ["kw"],
-                            "clip": True,
-                            "clip_padding": 30,
-                        })
+                        handle_search_audio(
+                            {
+                                "audio_path": "/fake.mp3",
+                                "keywords": ["kw"],
+                                "clip": True,
+                                "clip_padding": 30,
+                            }
+                        )
 
                         assert mock_clips.call_args[1]["padding"] == 30
