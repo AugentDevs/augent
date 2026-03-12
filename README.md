@@ -196,14 +196,14 @@ Open: **http://127.0.0.1:9797**
 4. **YouTube timestamps** are automatically hyperlinked when the source is YouTube
 
 **Memory Explorer:**
-- Browse all stored transcriptions with titles, durations, and dates
+- Browse **all** stored transcriptions — including files transcribed via MCP or CLI, not just the Web UI. Every tool writes to the same memory.
 - View full transcripts with clickable YouTube timestamps
 - **Delete** individual transcriptions from memory
-- **Show Audio** to reveal the source file in Finder
-- **Show Transcript** to reveal the `.md` transcript file in Finder
+- **Show Audio** to reveal the source audio file in Finder
+- **Show Transcript** to reveal the `.md` transcript file in Finder — drag it into a Claude Code session to run the full MCP pipeline on a previously transcribed file
 - **Share as HTML** — self-contained, shareable transcript pages
 - **Google Translate** for non-English transcriptions
-- Search across all memories by keyword
+- **Search across all memories** by keyword — finds matches across every transcription in your library
 
 **YouTube URL persistence:** When audio is downloaded from YouTube (via MCP, CLI, or the web UI), the source URL is permanently stored by file hash. Any future search or transcription of that file — even weeks later, even from a different path — automatically includes clickable YouTube timestamps. No need to re-enter the URL.
 
@@ -213,7 +213,7 @@ Open: **http://127.0.0.1:9797**
 | Command | Description |
 |:--------|:------------|
 | `python3 -m augent.web` | Start on port 9797 |
-| `python3 -m augent.web --port 3000` | Custom port |
+| `python3 -m augent.web --port 8585` | Custom port |
 
 </details>
 
