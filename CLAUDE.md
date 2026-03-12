@@ -207,6 +207,17 @@ Returns `{stems: {vocals: "/path", ...}, vocals_path: "/path/to/vocals.wav", mod
 
 **Workflow:** Use `vocals_path` from the response as the `audio_path` for transcribe_audio, search_audio, deep_search, or any other tool.
 
+### clip_export
+Export a video clip from a URL for a specific time range. Downloads only the requested segment — not the full video. Perfect for extracting moments around keyword matches.
+```
+url: "https://youtube.com/watch?v=xxx"
+start: 120 (seconds)
+end: 180 (seconds)
+output_dir: "~/Desktop" (optional, default)
+output_filename: "my_clip" (optional, auto-generated if not set)
+```
+Returns `{file_path, duration, start, end, url}`
+
 ### identify_speakers
 Identify who speaks when in audio using pyannote speaker diarization. No API keys or tokens required.
 ```
