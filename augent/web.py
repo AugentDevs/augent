@@ -2024,6 +2024,18 @@ async def download_and_search(request: Request):
                 )
                 return
             local_path = resolved
+            # Inline path containment check (CodeQL cannot trace through earlier guard)
+            if not (
+                local_path == home
+                or local_path.startswith(home + os.sep)
+                or local_path == tmp
+                or local_path.startswith(tmp + os.sep)
+            ):
+                yield send(
+                    "log",
+                    text="  [error] access denied: path must be under home directory or /tmp",
+                )
+                return
             if not os.path.isfile(local_path):
                 yield send("log", text=f"  [error] file not found: {local_path}")
                 return

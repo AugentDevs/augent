@@ -174,6 +174,16 @@ class TranscriptionMemory:
         safe_path = TranscriptionMemory._validate_path(file_path)
         if not os.path.isfile(safe_path):
             raise FileNotFoundError(f"Audio file not found: {safe_path}")
+        # Inline path containment check (CodeQL cannot trace through _validate_path)
+        _home = os.path.realpath(os.path.expanduser("~"))
+        _tmp = os.path.realpath("/tmp")
+        if not (
+            safe_path == _home
+            or safe_path.startswith(_home + os.sep)
+            or safe_path == _tmp
+            or safe_path.startswith(_tmp + os.sep)
+        ):
+            raise ValueError(f"Access denied: {safe_path}")
         with open(safe_path, "rb") as f:
             # Read in chunks for memory efficiency with large files
             for chunk in iter(lambda: f.read(8192), b""):
