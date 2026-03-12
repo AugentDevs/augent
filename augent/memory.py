@@ -150,9 +150,10 @@ class TranscriptionMemory:
         """
         hasher = hashlib.sha256()
         home = os.path.realpath(os.path.expanduser("~"))
+        tmp = os.path.realpath("/tmp")
         resolved = os.path.realpath(file_path)
         if not resolved.startswith(home + os.sep) and not resolved.startswith(
-            "/tmp" + os.sep
+            tmp + os.sep
         ):
             raise ValueError(
                 f"Access denied: path must be under home directory or /tmp: {resolved}"
