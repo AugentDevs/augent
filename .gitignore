@@ -85,6 +85,11 @@ venv.bak/
 *.m4a
 *.ogg
 *.flac
+*.webm
+*.mp4
+*.mkv
+*.webp
+*.aac
 clips/
 cache/
 
