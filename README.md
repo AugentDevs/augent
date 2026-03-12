@@ -80,6 +80,8 @@ flowchart LR
     F --> F2["Chapters"]
     F --> F3["Notes"]
 
+    E --> E6["Clip Export"]
+
     G --> G1["Text to Speech"]
 ```
 
