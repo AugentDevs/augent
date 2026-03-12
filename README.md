@@ -206,7 +206,7 @@ Open: **http://127.0.0.1:8282**
 - **Share as HTML** to download a self-contained, shareable transcript page
 - **Search across all memories** by keyword to find matches across every transcription in your library
 
-**YouTube URL persistence:** When audio is downloaded from YouTube (via MCP, CLI, or the web UI), the source URL is permanently stored by file hash. Any future search or transcription of that file, even weeks later or from a different path, automatically includes clickable YouTube timestamps. No need to re-enter the URL.
+**Source URL persistence:** When audio is downloaded from any URL — YouTube, Twitter/X, TikTok, Instagram, SoundCloud, and 1000+ sites — the source URL is permanently stored by file hash. Any future search or transcription of that file, even weeks later or from a different path, automatically links back to the original source. No need to re-enter the URL.
 
 <details>
 <summary>Web UI options</summary>

@@ -66,7 +66,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Persistent YouTube URLs:** YouTube source URLs are now stored permanently by audio file hash in a dedicated `source_urls` table. Any future search or transcription of the same file — even after restarts, from a different path — automatically includes clickable YouTube timestamps. No manual URL entry needed.
+- **Persistent source URLs:** Source URLs from any platform (YouTube, Twitter/X, TikTok, Instagram, SoundCloud, and 1000+ sites) are now stored permanently by audio file hash in a dedicated `source_urls` table. Any future search or transcription of the same file — even after restarts, from a different path — automatically links back to the original source. No manual URL entry needed.
 - **Web UI Memory Explorer:** browse, search, view, and delete stored transcriptions from the browser. Each entry shows title, duration, model size, and date. YouTube-sourced entries are marked with a YT badge.
 - **Web UI memory deletion:** trash icon on each memory card with confirmation dialog. Removes the transcription, embeddings, and `.md` file.
 - **Web UI YouTube timestamp linking:** after uploading a file, paste a YouTube URL inline in the results to retroactively add clickable timestamp links to all matches.
