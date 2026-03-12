@@ -396,7 +396,9 @@ class TranscriptionMemory:
                     ]
                     if source_url:
                         lines.append(f"**URL:** {source_url}  ")
-                    lines.extend(["", "---", "", "## Translation", "", translated_text, ""])
+                    lines.extend(
+                        ["", "---", "", "## Translation", "", translated_text, ""]
+                    )
                     translated_md_path.write_text("\n".join(lines), encoding="utf-8")
 
                     conn.execute(

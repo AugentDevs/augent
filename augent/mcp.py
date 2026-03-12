@@ -1073,6 +1073,7 @@ def handle_transcribe_audio(arguments: dict) -> dict:
     # If only storing a translation, do that and return early (no re-transcription)
     if translated_text:
         from .memory import get_transcription_memory
+
         memory = get_transcription_memory()
         md_path = memory.store_translation(audio_path, model_size, translated_text)
         if md_path:
@@ -1186,7 +1187,7 @@ def handle_transcribe_audio(arguments: dict) -> dict:
             f"---\n"
             f"This audio is in **{lang}**. Would you like me to translate it to English and store it in your augent memory?\n\n"
             f"If the user says yes, translate the transcription yourself and call "
-            f"transcribe_audio(audio_path=\"{original_audio_path}\", translated_text=\"<your full english translation>\") "
+            f'transcribe_audio(audio_path="{original_audio_path}", translated_text="<your full english translation>") '
             f"to store it."
         )
 
@@ -1702,13 +1703,13 @@ def handle_take_notes(arguments: dict) -> dict:
             f"This audio is in **{lang}**. Would you like me to translate it to English "
             f"and store it in your augent memory?\n\n"
             f"If the user says yes, translate the transcription yourself and call "
-            f"transcribe_audio(audio_path=\"{audio_path}\", translated_text=\"<your full english translation>\") "
+            f'transcribe_audio(audio_path="{audio_path}", translated_text="<your full english translation>") '
             f"to store it."
         )
     else:
-        response["instruction"] += (
-            f"\n\nAfter saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
-        )
+        response[
+            "instruction"
+        ] += f"\n\nAfter saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
 
     return response
 
@@ -2058,7 +2059,9 @@ def handle_clip_export(arguments: dict) -> dict:
     output_dir = os.path.expanduser(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    ytdlp = shutil.which("yt-dlp", path="/opt/homebrew/bin:/usr/local/bin") or shutil.which("yt-dlp")
+    ytdlp = shutil.which(
+        "yt-dlp", path="/opt/homebrew/bin:/usr/local/bin"
+    ) or shutil.which("yt-dlp")
     if not ytdlp:
         raise FileNotFoundError("yt-dlp not found. Install with: pip install yt-dlp")
 
@@ -2074,17 +2077,24 @@ def handle_clip_export(arguments: dict) -> dict:
     if output_filename:
         out_template = os.path.join(output_dir, f"{output_filename}.%(ext)s")
     else:
-        out_template = os.path.join(output_dir, "%(title)s_clip_%(section_start)s-%(section_end)s.%(ext)s")
+        out_template = os.path.join(
+            output_dir, "%(title)s_clip_%(section_start)s-%(section_end)s.%(ext)s"
+        )
 
     cmd = [
         ytdlp,
-        "--download-sections", section,
+        "--download-sections",
+        section,
         "--force-keyframes-at-cuts",
-        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "--merge-output-format", "mp4",
+        "-f",
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "--merge-output-format",
+        "mp4",
         "--no-playlist",
-        "-o", out_template,
-        "--print", "after_move:filepath",
+        "-o",
+        out_template,
+        "--print",
+        "after_move:filepath",
         url,
     ]
 

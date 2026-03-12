@@ -1871,11 +1871,15 @@ async def search_from_memory(request: Request):
             yield send("log", text="  [error] transcription not found in memory")
             return
 
-        yield send("box", lines=[
-            f"[augent] title: {entry.title}",
-            f"[augent] keywords: {', '.join(keyword_list)}",
-            f"[augent] model: {entry.model_size}",
-        ], banner=False)
+        yield send(
+            "box",
+            lines=[
+                f"[augent] title: {entry.title}",
+                f"[augent] keywords: {', '.join(keyword_list)}",
+                f"[augent] model: {entry.model_size}",
+            ],
+            banner=False,
+        )
 
         yield send("log", text="  [memory] loaded from memory")
         yield send("log", text=f"  [info] duration: {format_time(entry.duration)}")
@@ -1898,7 +1902,11 @@ async def search_from_memory(request: Request):
             kw = m.keyword
             if kw not in grouped:
                 grouped[kw] = []
-            e = {"timestamp": m.timestamp, "timestamp_seconds": m.timestamp_seconds, "snippet": m.snippet}
+            e = {
+                "timestamp": m.timestamp,
+                "timestamp_seconds": m.timestamp_seconds,
+                "snippet": m.snippet,
+            }
             if entry.source_url:
                 yt_link = _youtube_timestamp_link(entry.source_url, m.timestamp_seconds)
                 if yt_link:
@@ -1914,7 +1922,12 @@ async def search_from_memory(request: Request):
         async with _latest_results_lock:
             _latest_results = {"grouped": grouped, "total": len(matches)}
 
-        yield send("results", grouped=grouped, total=len(matches), source_url=entry.source_url or "")
+        yield send(
+            "results",
+            grouped=grouped,
+            total=len(matches),
+            source_url=entry.source_url or "",
+        )
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -1926,12 +1939,12 @@ async def download_and_search(request: Request):
     url = body.get("url", "")
     model_size = body.get("model_size", "tiny")
     keywords_str = body.get("keywords", "")
+
     async def event_stream():
         global _latest_results
 
         def send(type_, **kwargs):
             return f"data: {json.dumps({'type': type_, **kwargs})}\n\n"
-
 
         keyword_list = [k.strip().lower() for k in keywords_str.split(",") if k.strip()]
         if not keyword_list:
@@ -2023,7 +2036,9 @@ async def download_and_search(request: Request):
 
             if stored:
                 yield send("log", text="  [memory] loaded from memory")
-                yield send("log", text=f"  [info] duration: {format_time(stored.duration)}")
+                yield send(
+                    "log", text=f"  [info] duration: {format_time(stored.duration)}"
+                )
                 yield send("log", text="")
                 all_words = stored.words
             else:
@@ -2048,7 +2063,13 @@ async def download_and_search(request: Request):
                 yield send("log", text="")
 
                 for segment in segments_gen:
-                    segments.append({"start": segment.start, "end": segment.end, "text": segment.text})
+                    segments.append(
+                        {
+                            "start": segment.start,
+                            "end": segment.end,
+                            "text": segment.text,
+                        }
+                    )
                     ts = format_time(segment.start)
                     yield send("log", text=f"  [{ts}] {segment.text.strip()}")
                     if duration > 0:
@@ -2056,22 +2077,36 @@ async def download_and_search(request: Request):
                         yield send("progress", pct=pct, label=f"Transcribing — {pct}%")
                     if segment.words:
                         for word in segment.words:
-                            all_words.append({"word": word.word.strip(), "start": word.start, "end": word.end})
+                            all_words.append(
+                                {
+                                    "word": word.word.strip(),
+                                    "start": word.start,
+                                    "end": word.end,
+                                }
+                            )
                             clean = word.word.lower().strip(".,!?;:'\"")
                             for kw in keyword_list:
                                 if kw in clean:
-                                    yield send("log", text=f"         >> match: '{kw}' @ {format_time(word.start)}")
+                                    yield send(
+                                        "log",
+                                        text=f"         >> match: '{kw}' @ {format_time(word.start)}",
+                                    )
                     await asyncio.sleep(0)
 
                 yield send("progress", pct=100, label="Transcription complete")
 
                 try:
-                    memory.set(audio_path, model_size, {
-                        "text": " ".join(s["text"].strip() for s in segments),
-                        "language": info.language,
-                        "duration": duration,
-                        "segments": segments, "words": all_words,
-                    })
+                    memory.set(
+                        audio_path,
+                        model_size,
+                        {
+                            "text": " ".join(s["text"].strip() for s in segments),
+                            "language": info.language,
+                            "duration": duration,
+                            "segments": segments,
+                            "words": all_words,
+                        },
+                    )
                     yield send("log", text="  [memory] saved to memory")
                 except Exception as mem_err:
                     yield send("log", text=f"  [memory] save failed: {mem_err}")
@@ -2089,7 +2124,13 @@ async def download_and_search(request: Request):
                 kw = m.keyword
                 if kw not in grouped:
                     grouped[kw] = []
-                grouped[kw].append({"timestamp": m.timestamp, "timestamp_seconds": m.timestamp_seconds, "snippet": m.snippet})
+                grouped[kw].append(
+                    {
+                        "timestamp": m.timestamp,
+                        "timestamp_seconds": m.timestamp_seconds,
+                        "snippet": m.snippet,
+                    }
+                )
 
             yield send("log", text="")
             _lines = [f"[done] {len(matches)} matches found"]
@@ -2195,9 +2236,7 @@ async def download_and_search(request: Request):
                 yield send("status", text="Transcribing audio...")
 
                 transcribe_kwargs = {"word_timestamps": True, "vad_filter": True}
-                segments_gen, info = model.transcribe(
-                    audio_path, **transcribe_kwargs
-                )
+                segments_gen, info = model.transcribe(audio_path, **transcribe_kwargs)
 
                 duration = info.duration
                 all_words = []
@@ -2326,7 +2365,9 @@ async def clip_export(request: Request):
     if end <= start:
         return JSONResponse({"error": "End must be after start"})
 
-    ytdlp = shutil.which("yt-dlp", path="/opt/homebrew/bin:/usr/local/bin") or shutil.which("yt-dlp")
+    ytdlp = shutil.which(
+        "yt-dlp", path="/opt/homebrew/bin:/usr/local/bin"
+    ) or shutil.which("yt-dlp")
     if not ytdlp:
         return JSONResponse({"error": "yt-dlp not found"})
 
@@ -2341,13 +2382,18 @@ async def clip_export(request: Request):
 
     cmd = [
         ytdlp,
-        "--download-sections", section,
+        "--download-sections",
+        section,
         "--force-keyframes-at-cuts",
-        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "--merge-output-format", "mp4",
+        "-f",
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "--merge-output-format",
+        "mp4",
         "--no-playlist",
-        "-o", os.path.join(output_dir, "%(title)s_clip.%(ext)s"),
-        "--print", "after_move:filepath",
+        "-o",
+        os.path.join(output_dir, "%(title)s_clip.%(ext)s"),
+        "--print",
+        "after_move:filepath",
         url,
     ]
 
@@ -2371,13 +2417,15 @@ async def clip_export(request: Request):
     file_size = os.path.getsize(clip_path)
     duration = end - start
 
-    return JSONResponse({
-        "clip_path": clip_path,
-        "filename": os.path.basename(clip_path),
-        "duration": duration,
-        "duration_formatted": f"{int(duration // 60)}:{int(duration % 60):02d}",
-        "file_size_mb": round(file_size / (1024 * 1024), 2),
-    })
+    return JSONResponse(
+        {
+            "clip_path": clip_path,
+            "filename": os.path.basename(clip_path),
+            "duration": duration,
+            "duration_formatted": f"{int(duration // 60)}:{int(duration % 60):02d}",
+            "file_size_mb": round(file_size / (1024 * 1024), 2),
+        }
+    )
 
 
 @app.get("/api/export")
@@ -2639,9 +2687,7 @@ async def api_memory_reveal(cache_key: str, target: str = Query("audio")):
         except Exception:
             pass
         if not md_path or not os.path.exists(md_path):
-            return JSONResponse(
-                {"error": "No transcript file found"}, status_code=404
-            )
+            return JSONResponse({"error": "No transcript file found"}, status_code=404)
         file_path = md_path
     else:
         # Default: reveal the audio file
