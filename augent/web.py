@@ -1735,7 +1735,7 @@ async def search_audio(
                 yield send("btn_text", text="TRANSCRIBING...")
                 yield send("status", text="Transcribing audio...")
 
-                transcribe_kwargs = dict(word_timestamps=True, vad_filter=True)
+                transcribe_kwargs = {"word_timestamps": True, "vad_filter": True}
                 segments_gen, info = model.transcribe(tmp_path, **transcribe_kwargs)
 
                 duration = info.duration
@@ -2037,7 +2037,7 @@ async def download_and_search(request: Request):
                 yield send("btn_text", text="TRANSCRIBING...")
                 yield send("status", text="Transcribing audio...")
 
-                transcribe_kwargs = dict(word_timestamps=True, vad_filter=True)
+                transcribe_kwargs = {"word_timestamps": True, "vad_filter": True}
                 segments_gen, info = model.transcribe(audio_path, **transcribe_kwargs)
                 duration = info.duration
                 all_words = []
@@ -2194,7 +2194,7 @@ async def download_and_search(request: Request):
                 yield send("btn_text", text="TRANSCRIBING...")
                 yield send("status", text="Transcribing audio...")
 
-                transcribe_kwargs = dict(word_timestamps=True, vad_filter=True)
+                transcribe_kwargs = {"word_timestamps": True, "vad_filter": True}
                 segments_gen, info = model.transcribe(
                     audio_path, **transcribe_kwargs
                 )

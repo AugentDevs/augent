@@ -1079,7 +1079,7 @@ def handle_transcribe_audio(arguments: dict) -> dict:
             return {
                 "status": "translation_stored",
                 "translated_md_path": md_path,
-                "message": f"English translation saved alongside original transcription.",
+                "message": "English translation saved alongside original transcription.",
             }
         else:
             raise ValueError(
@@ -1430,7 +1430,6 @@ def _get_style_instruction(
         "Do NOT leave the raw transcription as-is. Do NOT create .md files. "
         "For any follow-up tool calls (chapters, search, deep_search, etc.), use the audio_path field from this response — do NOT guess the filename. "
     )
-    label = "Quiz" if style == "quiz" else "Notes"
     base_suffix = (
         '\n\nSave the final notes by calling: take_notes(save_content="<your formatted notes>"). '
         "Do NOT use the Write tool."

@@ -392,7 +392,7 @@ class TranscriptionMemory:
                         "",
                         f"**Source:** `{src_basename}`  ",
                         f"**Duration:** {mins}:{secs:02d}  ",
-                        f"**Language:** en (translated)  ",
+                        "**Language:** en (translated)  ",
                     ]
                     if source_url:
                         lines.append(f"**URL:** {source_url}  ")
