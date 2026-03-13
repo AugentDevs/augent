@@ -645,9 +645,9 @@ download_pyannote_models() {
         return 0
     fi
 
-    log_info "Downloading pyannote speaker diarization models (~29MB)..."
+    start_spinner "Downloading pyannote speaker diarization models (~29MB)"
 
-        # Models are static assets — always fetch from the release where they were uploaded
+    # Models are static assets — always fetch from the release where they were uploaded
     local url="https://github.com/AugentDevs/Augent/releases/download/v2026.3.8/pyannote-speaker-diarization-3.1.tar.gz"
     local tmp_tar="/tmp/pyannote-models.tar.gz"
 
@@ -655,8 +655,10 @@ download_pyannote_models() {
         mkdir -p "$cache_dir"
         tar xzf "$tmp_tar" -C "$cache_dir" 2>/dev/null
         rm -f "$tmp_tar"
+        stop_spinner
         log_success "pyannote models"
     else
+        stop_spinner
         log_warn "Could not download pyannote models (speaker identification will not work)"
     fi
 }
