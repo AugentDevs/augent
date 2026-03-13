@@ -2001,44 +2001,21 @@ async def download_and_search(request: Request):
         # Handle file:// paths — search local audio directly
         local_path = None
         if url.startswith("file://"):
-            raw_path = url[7:]  # strip file://
-            resolved = os.path.realpath(raw_path)
-            home = os.path.realpath(os.path.expanduser("~"))
-            tmp = os.path.realpath("/tmp")
-            path_ok = False
-            try:
-                if os.path.commonpath([resolved, home]) == home:
-                    path_ok = True
-            except ValueError:
-                pass
-            if not path_ok:
-                try:
-                    if os.path.commonpath([resolved, tmp]) == tmp:
-                        path_ok = True
-                except ValueError:
-                    pass
-            if not path_ok:
+            from pathlib import Path
+
+            resolved = Path(url[7:]).resolve()
+            home = Path.home().resolve()
+            tmp = Path("/tmp").resolve()
+            if not (resolved.is_relative_to(home) or resolved.is_relative_to(tmp)):
                 yield send(
                     "log",
                     text="  [error] access denied: path must be under home directory or /tmp",
                 )
                 return
-            local_path = resolved
-            # Inline path containment check (CodeQL cannot trace through earlier guard)
-            if not (
-                local_path == home
-                or local_path.startswith(home + os.sep)
-                or local_path == tmp
-                or local_path.startswith(tmp + os.sep)
-            ):
-                yield send(
-                    "log",
-                    text="  [error] access denied: path must be under home directory or /tmp",
-                )
+            if not resolved.is_file():
+                yield send("log", text=f"  [error] file not found: {resolved}")
                 return
-            if not os.path.isfile(local_path):
-                yield send("log", text=f"  [error] file not found: {local_path}")
-                return
+            local_path = str(resolved)
 
         display_url = os.path.basename(local_path) if local_path else url
         box_lines = [
