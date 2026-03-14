@@ -684,19 +684,14 @@ verify_packages() {
     # --- Core packages (hard fail if missing) ---
     local core_ok=true
 
-    if ! spin_check "augent" $PYTHON_CMD -c "import augent"; then
-        log_error "augent package cannot be imported"
-        core_ok=false
-    fi
-
-    if ! spin_check "faster-whisper" $PYTHON_CMD -c "import faster_whisper"; then
-        log_error "faster-whisper package cannot be imported"
-        core_ok=false
-    fi
+    start_spinner "augent, faster-whisper"
+    $PYTHON_CMD -c "import augent" 2>/dev/null || core_ok=false
+    $PYTHON_CMD -c "import faster_whisper" 2>/dev/null || core_ok=false
+    stop_spinner
 
     if [[ "$core_ok" != "true" ]]; then
+        log_error "augent, faster-whisper"
         echo ""
-        log_error "Core packages failed to import."
         echo -e "  ${DIM}This usually means pip installed to a different Python than expected.${NC}"
         echo ""
         echo -e "  ${BOLD}Python used:${NC} $PYTHON_CMD"
@@ -706,16 +701,23 @@ verify_packages() {
         exit 1
     fi
 
-    # --- Optional packages (warn if missing) ---
+    log_success "augent, faster-whisper"
+
+    # --- Remaining packages (grouped into one line) ---
+    local all_ok=true
     local missing_extras=()
 
-    if ! spin_check "sentence-transformers" $PYTHON_CMD -c "import sentence_transformers"; then
-        log_warn "sentence-transformers not available (deep search, chapters)"
-        missing_extras+=("semantic")
-    fi
+    start_spinner "sentence-transformers, pyannote-audio, kokoro, demucs"
+    $PYTHON_CMD -c "import sentence_transformers" 2>/dev/null || { all_ok=false; missing_extras+=("semantic"); }
+    $PYTHON_CMD -c "import pyannote.audio" 2>/dev/null || { all_ok=false; missing_extras+=("speakers"); }
+    $PYTHON_CMD -c "import kokoro" 2>/dev/null || { all_ok=false; missing_extras+=("tts"); }
+    $PYTHON_CMD -c "import demucs" 2>/dev/null || { all_ok=false; missing_extras+=("separator"); }
+    stop_spinner
 
-    if spin_check "pyannote-audio" $PYTHON_CMD -c "import pyannote.audio"; then
-        # Download pre-packaged pyannote models if not already cached (silent — folded into one line)
+    if [[ "$all_ok" == "true" ]]; then
+        log_success "sentence-transformers, pyannote-audio, kokoro, demucs"
+
+        # Download pre-packaged pyannote models if not already cached
         local cache_dir="$HOME/.cache/huggingface/hub"
         local marker="$cache_dir/models--pyannote--speaker-diarization-3.1"
         if [[ ! -d "$marker" ]]; then
@@ -728,30 +730,16 @@ verify_packages() {
             fi
         fi
     else
-        log_warn "pyannote-audio not available (speaker identification)"
-        missing_extras+=("speakers")
-    fi
-
-    if ! spin_check "kokoro" $PYTHON_CMD -c "import kokoro"; then
-        log_warn "kokoro not available (text-to-speech)"
-        missing_extras+=("tts")
-    fi
-
-    if ! spin_check "demucs" $PYTHON_CMD -c "import demucs"; then
-        log_warn "demucs not available (audio source separation)"
-        missing_extras+=("separator")
-    fi
-
-    if [[ ${#missing_extras[@]} -eq 0 ]]; then
-        log_success "All packages verified"
-    else
         local joined
         joined=$(IFS=,; echo "${missing_extras[*]}")
+        log_warn "sentence-transformers, pyannote-audio, kokoro, demucs (missing: $joined)"
         local pip_flag
         pip_flag="$( [[ "$PKG_MGR" == "brew" ]] && echo "--break-system-packages" || echo "--user" )"
-        echo -e "  ${DIM}Install missing extras:${NC}"
+        echo -e "  ${DIM}Install with:${NC}"
         echo -e "  $PYTHON_CMD -m pip install \"augent[$joined]\" $pip_flag"
     fi
+
+    log_success "All packages verified"
 }
 
 # ============================================================================
