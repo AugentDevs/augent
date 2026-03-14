@@ -54,15 +54,20 @@ Works on macOS and Linux. Installs everything automatically.
 
 The installer is a single bash script ([source](https://github.com/AugentDevs/Augent/blob/main/install.sh)). Every dependency is open source:
 
-| System packages | Python packages |
+| Dependency | What it does |
 |---|---|
-| [Python](https://github.com/python/cpython) | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) |
-| [FFmpeg](https://github.com/FFmpeg/FFmpeg) | [PyTorch](https://github.com/pytorch/pytorch) |
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | [sentence-transformers](https://github.com/UKPLab/sentence-transformers) |
-| [aria2](https://github.com/aria2/aria2) | [pyannote-audio](https://github.com/pyannote/pyannote-audio) |
-| [espeak-ng](https://github.com/espeak-ng/espeak-ng) | [Kokoro](https://github.com/hexgrad/kokoro) |
-| | [Demucs](https://github.com/adefossez/demucs) |
-| | [FastAPI](https://github.com/fastapi/fastapi) |
+| [Python](https://github.com/python/cpython) | Runtime |
+| [FFmpeg](https://github.com/FFmpeg/FFmpeg) | Audio processing |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Media downloads |
+| [aria2](https://github.com/aria2/aria2) | Parallel downloads |
+| [espeak-ng](https://github.com/espeak-ng/espeak-ng) | TTS phonemizer |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Speech-to-text |
+| [PyTorch](https://github.com/pytorch/pytorch) | ML framework |
+| [sentence-transformers](https://github.com/UKPLab/sentence-transformers) | Semantic search |
+| [pyannote-audio](https://github.com/pyannote/pyannote-audio) | Speaker diarization |
+| [Kokoro](https://github.com/hexgrad/kokoro) | Text-to-speech |
+| [Demucs](https://github.com/adefossez/demucs) | Audio source separation |
+| [FastAPI](https://github.com/fastapi/fastapi) | Local web UI |
 
 No background services. No telemetry. No sudo on macOS.
 
