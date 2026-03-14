@@ -52,14 +52,13 @@ Works on macOS and Linux. Installs everything automatically.
 
 <br />
 
-The installer is a single bash script ([source](https://github.com/AugentDevs/Augent/blob/main/install.sh)). It does four things:
+The installer is a single bash script ([source](https://github.com/AugentDevs/Augent/blob/main/install.sh)). It does three things:
 
-1. Installs system dependencies via your package manager — [Python](https://github.com/python/cpython), [FFmpeg](https://github.com/FFmpeg/FFmpeg), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [aria2](https://github.com/aria2/aria2), [espeak-ng](https://github.com/espeak-ng/espeak-ng)
-2. Installs Augent and its Python dependencies via pip — [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [sentence-transformers](https://github.com/UKPLab/sentence-transformers), [pyannote-audio](https://github.com/pyannote/pyannote-audio), [Kokoro](https://github.com/hexgrad/kokoro), [Demucs](https://github.com/adefossez/demucs), [PyTorch](https://github.com/pytorch/pytorch), [FastAPI](https://github.com/fastapi/fastapi)
-3. Appends `~/.local/bin` to PATH in your shell rc file if not already present
-4. Registers the MCP server with Claude Code via `claude mcp add`
+1. **Dependencies** — installs open source system packages via your package manager ([Python](https://github.com/python/cpython), [FFmpeg](https://github.com/FFmpeg/FFmpeg), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [aria2](https://github.com/aria2/aria2), [espeak-ng](https://github.com/espeak-ng/espeak-ng)) and Python packages via pip ([faster-whisper](https://github.com/SYSTRAN/faster-whisper), [sentence-transformers](https://github.com/UKPLab/sentence-transformers), [pyannote-audio](https://github.com/pyannote/pyannote-audio), [Kokoro](https://github.com/hexgrad/kokoro), [Demucs](https://github.com/adefossez/demucs), [PyTorch](https://github.com/pytorch/pytorch), [FastAPI](https://github.com/fastapi/fastapi))
+2. **PATH** — adds bin directories to your shell rc file if not already present
+3. **MCP** — registers the Augent MCP server with Claude Code (and [OpenClaw](https://openclaw.ai) if detected)
 
-Every dependency is open source. No background services. No telemetry. No sudo on macOS. Packages are fetched from GitHub, PyPI, and Homebrew — nothing else is contacted.
+Every dependency is open source. No background services. No telemetry. No sudo on macOS.
 
 [Detailed breakdown](https://docs.augent.app/getting-started/installation) · [Manual install](https://docs.augent.app/getting-started/installation#manual-install) · [Uninstall](https://docs.augent.app/getting-started/installation#uninstall)
 
