@@ -60,7 +60,11 @@ The installer is a single bash script ([source](https://github.com/AugentDevs/Au
 
 Every dependency is open source. No background services. No telemetry. No sudo on macOS.
 
-[Detailed breakdown](https://docs.augent.app/getting-started/installation) · [Manual install](https://docs.augent.app/getting-started/installation#manual-install) · [Uninstall](https://docs.augent.app/getting-started/installation#uninstall)
+| | |
+|---|---|
+| [**Full breakdown**](https://docs.augent.app/getting-started/installation) | What each phase installs and why |
+| [**Manual install**](https://docs.augent.app/getting-started/installation#manual-install) | Step-by-step for macOS, Linux, and Windows |
+| [**Uninstall**](https://docs.augent.app/getting-started/installation#uninstall) | How to fully remove Augent |
 
 </details>
 
