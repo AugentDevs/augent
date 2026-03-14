@@ -57,7 +57,7 @@ start_spinner() {
             local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
             local i=0
             while true; do
-                printf "\r  \033[0;96m%s\033[0m  %s" "${frames[$i]}" "$msg" > /dev/tty
+                printf "\r\033[0;96m%s\033[0m %s" "${frames[$i]}" "$msg" > /dev/tty
                 i=$(( (i + 1) % 10 ))
                 sleep 0.08
             done
@@ -715,8 +715,18 @@ verify_packages() {
     fi
 
     if spin_check "pyannote-audio" $PYTHON_CMD -c "import pyannote.audio"; then
-        # Download pre-packaged pyannote models if not already cached
-        download_pyannote_models
+        # Download pre-packaged pyannote models if not already cached (silent — folded into one line)
+        local cache_dir="$HOME/.cache/huggingface/hub"
+        local marker="$cache_dir/models--pyannote--speaker-diarization-3.1"
+        if [[ ! -d "$marker" ]]; then
+            local url="https://github.com/AugentDevs/Augent/releases/download/v2026.3.8/pyannote-speaker-diarization-3.1.tar.gz"
+            local tmp_tar="/tmp/pyannote-models.tar.gz"
+            if curl -fsSL "$url" -o "$tmp_tar" 2>/dev/null; then
+                mkdir -p "$cache_dir"
+                tar xzf "$tmp_tar" -C "$cache_dir" 2>/dev/null
+                rm -f "$tmp_tar"
+            fi
+        fi
     else
         log_warn "pyannote-audio not available (speaker identification)"
         missing_extras+=("speakers")
@@ -809,9 +819,9 @@ configure_mcp() {
     if command_exists claude; then
         claude mcp remove augent -s user >/dev/null 2>&1 || true
         claude mcp add augent -s user -- "$python_abs" -m augent.mcp >/dev/null 2>&1
-        log_success "Claude Code MCP"
+        log_success "Claude Code MCP configured"
     else
-        log_warn "Claude Code not found - install it, then run:"
+        log_warn "Claude Code not found — install it, then run:"
         log_info "  claude mcp add augent -s user -- $python_abs -m augent.mcp"
     fi
 
@@ -837,14 +847,14 @@ configure_mcp() {
         fi
 
         if [[ -f "$skill_dir/SKILL.md" ]]; then
-            log_success "OpenClaw skill installed"
+            log_success "OpenClaw detected, skill configured"
         fi
 
         # Add MCP server to OpenClaw config
         local oc_config="$HOME/.openclaw/openclaw.json"
         if [[ -f "$oc_config" ]]; then
             if grep -q '"augent"' "$oc_config" 2>/dev/null; then
-                log_success "OpenClaw MCP (already configured)"
+                log_success "OpenClaw MCP (already set up)"
             elif command_exists jq; then
                 local oc_tmp="$oc_config.tmp"
                 jq --arg py "$python_abs" '.mcpServers.augent = {"command": $py, "args": ["-m", "augent.mcp"]}' "$oc_config" > "$oc_tmp" 2>/dev/null && mv "$oc_tmp" "$oc_config"
