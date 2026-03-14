@@ -834,22 +834,20 @@ configure_mcp() {
             curl -fsSL "https://raw.githubusercontent.com/$AUGENT_REPO/main/openclaw/SKILL.md" -o "$skill_dir/SKILL.md" 2>/dev/null || true
         fi
 
-        if [[ -f "$skill_dir/SKILL.md" ]]; then
-            log_success "OpenClaw detected, skill configured"
-        fi
-
         # Add MCP server to OpenClaw config
         local oc_config="$HOME/.openclaw/openclaw.json"
+        local oc_mcp_ok=false
         if [[ -f "$oc_config" ]]; then
             if grep -q '"augent"' "$oc_config" 2>/dev/null; then
-                log_success "OpenClaw MCP (already set up)"
+                oc_mcp_ok=true
             elif command_exists jq; then
                 local oc_tmp="$oc_config.tmp"
-                jq --arg py "$python_abs" '.mcpServers.augent = {"command": $py, "args": ["-m", "augent.mcp"]}' "$oc_config" > "$oc_tmp" 2>/dev/null && mv "$oc_tmp" "$oc_config"
-                log_success "OpenClaw MCP"
+                if jq --arg py "$python_abs" '.mcpServers.augent = {"command": $py, "args": ["-m", "augent.mcp"]}' "$oc_config" > "$oc_tmp" 2>/dev/null && mv "$oc_tmp" "$oc_config"; then
+                    oc_mcp_ok=true
+                fi
             else
                 # No jq — create or append via Python
-                $PYTHON_CMD -c "
+                if $PYTHON_CMD -c "
 import json, os
 p = os.path.expanduser('$oc_config')
 c = {}
@@ -858,7 +856,9 @@ try:
 except: pass
 c.setdefault('mcpServers', {})['augent'] = {'command': '$python_abs', 'args': ['-m', 'augent.mcp']}
 with open(p, 'w') as f: json.dump(c, f, indent=2); f.write('\n')
-" 2>/dev/null && log_success "OpenClaw MCP" || log_warn "Add augent to OpenClaw config manually"
+" 2>/dev/null; then
+                    oc_mcp_ok=true
+                fi
             fi
         else
             # Create fresh config
@@ -873,7 +873,14 @@ with open(p, 'w') as f: json.dump(c, f, indent=2); f.write('\n')
   }
 }
 OCEOF
-            log_success "OpenClaw MCP"
+            oc_mcp_ok=true
+        fi
+
+        if [[ "$oc_mcp_ok" == "true" ]] && [[ -f "$skill_dir/SKILL.md" ]]; then
+            log_success "OpenClaw detected, configured"
+        elif [[ -f "$skill_dir/SKILL.md" ]]; then
+            log_success "OpenClaw detected, skill configured"
+            log_warn "Add augent to OpenClaw config manually"
         fi
     fi
 }
