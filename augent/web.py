@@ -584,13 +584,45 @@ select option { background:var(--black); color:var(--green); }
 .clip-status-bar a { color:var(--green); text-decoration:none; font-weight:600; }
 .clip-status-bar a:hover { text-decoration:underline; }
 .clip-status-bar .clip-done-icon { color:var(--green); font-size:14px; }
-.clip-keyboard-hint {
-    font-size:10px; color:var(--green-hint); margin-top:6px;
-    font-family:var(--mono);
+.clip-hints {
+    margin-top:8px; border-top:1px solid var(--green-border); padding-top:8px;
 }
-.clip-keyboard-hint kbd {
+.clip-hints .clip-hint-line {
+    display:block; font-size:10px; color:var(--green-hint);
+    font-family:var(--mono); padding-left:10px; text-indent:-10px;
+    line-height:1.7;
+}
+.clip-hints kbd {
     background:rgba(0,240,96,0.08); border:1px solid var(--green-border);
     border-radius:3px; padding:1px 5px; font-size:10px;
+}
+
+/* Region trim handles (Final Cut style) */
+#waveform ::part(region-handle) {
+    width:4px !important;
+}
+.wavesurfer-region {
+    border-left:3px solid var(--green) !important;
+    border-right:3px solid var(--green) !important;
+    border-top:1px solid rgba(0,240,96,0.4) !important;
+    border-bottom:1px solid rgba(0,240,96,0.4) !important;
+}
+.wavesurfer-region::before, .wavesurfer-region::after {
+    content:''; position:absolute; top:0; bottom:0; width:5px;
+    background:var(--green); opacity:0.7; cursor:ew-resize;
+    transition:opacity 0.15s;
+    z-index:3;
+}
+.wavesurfer-region::before { left:0; border-radius:3px 0 0 3px; }
+.wavesurfer-region::after { right:0; border-radius:0 3px 3px 0; }
+.wavesurfer-region:hover::before, .wavesurfer-region:hover::after { opacity:1; }
+.wavesurfer-region::before {
+    background:linear-gradient(90deg, var(--green) 2px, transparent 2px) left center / 2px 10px no-repeat,
+               var(--green);
+}
+.wavesurfer-region::after {
+    background:linear-gradient(90deg, transparent calc(100% - 2px), var(--green) calc(100% - 2px)) right center / 2px 10px no-repeat,
+               var(--green);
 }
 
 /* ======== MEMORY VIEW ======== */
@@ -914,8 +946,11 @@ select option { background:var(--black); color:var(--green); }
                     </div>
                 </div>
                 <div class="clip-status-bar" id="clipStatusBar"></div>
-                <div class="clip-keyboard-hint">
-                    <kbd>Space</kbd> preview &middot; <kbd>Enter</kbd> export &middot; <kbd>Esc</kbd> close &middot; drag region edges to adjust
+                <div class="clip-hints">
+                    <span class="clip-hint-line">&#183; <kbd>Space</kbd> preview</span>
+                    <span class="clip-hint-line">&#183; <kbd>Enter</kbd> export</span>
+                    <span class="clip-hint-line">&#183; <kbd>Esc</kbd> close</span>
+                    <span class="clip-hint-line">&#183; Drag region edges to adjust</span>
                 </div>
             </div>
         </div>
@@ -1100,6 +1135,7 @@ let memoryCacheKey = null;
 function searchFromMemory(cardEl) {
     const cacheKey = cardEl.dataset.key;
     const title = cardEl.dataset.title;
+    const sourceUrl = cardEl.dataset.sourceUrl || '';
 
     // Switch to search view
     switchView('search', document.querySelector('.nav-btn'));
@@ -1108,6 +1144,7 @@ function searchFromMemory(cardEl) {
     clearFile();
     clearUrl();
     memoryCacheKey = cacheKey;
+    lastSourceUrl = sourceUrl;
     uploadLabel.textContent = '📁 ' + title;
     uploadZone.classList.add('has-file');
 
@@ -1482,6 +1519,36 @@ let clipSourceUrl = '';
 let clipPreviewPlaying = false;
 let clipPreviewTimeout = null;
 
+function styleRegionHandles(region) {
+    // Style the region element for FCP-style trim handles
+    const el = region.element;
+    if (!el) return;
+    el.style.borderTop = '1px solid rgba(0,240,96,0.4)';
+    el.style.borderBottom = '1px solid rgba(0,240,96,0.4)';
+    // Find and style the resize handles
+    const handles = el.querySelectorAll('[data-resize]');
+    handles.forEach(h => {
+        h.style.width = '6px';
+        h.style.background = '#00F060';
+        h.style.opacity = '0.8';
+        h.style.borderRadius = '2px';
+        h.style.transition = 'opacity 0.15s';
+    });
+    // Fallback: style first and last child divs as handles
+    if (handles.length === 0) {
+        const children = el.children;
+        for (let i = 0; i < children.length; i++) {
+            const c = children[i];
+            if (c.style.cursor === 'ew-resize' || c.style.width === '4px' || c.style.width === '2px') {
+                c.style.width = '6px';
+                c.style.background = '#00F060';
+                c.style.opacity = '0.8';
+                c.style.borderRadius = '2px';
+            }
+        }
+    }
+}
+
 function fmtSec(s) {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
@@ -1505,6 +1572,7 @@ function initRegionsPlugin() {
         }
         clipRegion = region;
         region.setOptions({ color: 'rgba(0, 240, 96, 0.15)', drag: true, resize: true });
+        setTimeout(() => styleRegionHandles(region), 50);
         clipSourceUrl = lastSourceUrl || document.getElementById('audioUrl').value.trim();
         updateClipToolbar();
         showClipToolbar();
@@ -1546,6 +1614,7 @@ function openClipModal(url, timestampSec, keyword) {
     });
 
     _clipFromResult = false;
+    setTimeout(() => styleRegionHandles(clipRegion), 50);
 
     // Scroll waveform to the region
     wavesurfer.seekTo(Math.max(0, start / duration));
@@ -1635,7 +1704,7 @@ function stopClipPreview() {
 
 async function exportClip() {
     if (!clipRegion) return;
-    const url = clipSourceUrl || document.getElementById('audioUrl').value.trim();
+    const url = clipSourceUrl || lastSourceUrl || document.getElementById('audioUrl').value.trim();
     if (!url) {
         setClipStatus('No source URL — clip export requires a video URL', 'error');
         return;
