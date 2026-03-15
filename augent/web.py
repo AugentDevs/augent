@@ -882,7 +882,13 @@ select option { background:var(--black); color:var(--green); }
 .clips-body {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 24px 48px;
+    padding: 16px 24px 48px;
+}
+
+.clips-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
 }
 
 .clips-empty {
@@ -890,35 +896,36 @@ select option { background:var(--black); color:var(--green); }
     padding: 64px 24px;
     color: var(--green-dim);
     font-size: 14px;
+    grid-column: 1 / -1;
 }
 
 .clip-card {
     display: flex;
-    align-items: center;
-    gap: 16px;
+    flex-direction: column;
     padding: 14px 16px;
-    border: 1px solid transparent;
+    border: 1px solid var(--green-border);
     border-radius: 12px;
-    margin-bottom: 4px;
     transition: border-color 0.15s, background 0.15s;
+    position: relative;
 }
-.clip-card:hover { border-color: var(--green-border); background: var(--green-hover); }
+.clip-card:hover { border-color: var(--green-border-hover); background: var(--green-hover); }
 
-.clip-card .clip-info { flex: 1; min-width: 0; }
 .clip-card .clip-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
+    padding-right: 50px;
 }
 .clip-card .clip-meta {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-size: 11px;
     color: var(--green-dim);
+    flex-wrap: wrap;
 }
 .clip-card .clip-meta .pill {
     background: rgba(0,240,96,0.08);
@@ -931,27 +938,27 @@ select option { background:var(--black); color:var(--green); }
 }
 
 .clip-card .clip-actions {
+    position: absolute;
+    top: 10px;
+    right: 8px;
     display: flex;
-    gap: 6px;
-    flex-shrink: 0;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
 }
+.clip-card:hover .clip-actions { opacity: 0.7; }
 .clip-card .clip-actions button {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    border: 1px solid var(--green-border);
     background: none;
-    color: var(--green);
+    border: none;
     cursor: pointer;
+    padding: 4px;
+    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color 0.15s, background 0.15s;
+    color: var(--green);
 }
-.clip-card .clip-actions button:hover {
-    border-color: var(--green-border-hover);
-    background: var(--green-hover);
-}
+.clip-card .clip-actions button:hover { opacity: 1; }
 .clip-card .clip-actions button svg { width: 14px; height: 14px; }
 </style>
 </head>
@@ -1384,6 +1391,7 @@ async function startSearch() {
                             renderResults(data.grouped, data.total, lastSourceUrl);
                             jsonBox.textContent = JSON.stringify(data.grouped, null, 2);
                             exportBar.classList.add('visible');
+                            playSearchSound();
                             loadMemoryList();
                         }
                     }
@@ -1435,6 +1443,7 @@ async function startSearch() {
                             renderResults(data.grouped, data.total, lastSourceUrl);
                             jsonBox.textContent = JSON.stringify(data.grouped, null, 2);
                             exportBar.classList.add('visible');
+                            playSearchSound();
                             loadMemoryList();
                         }
                     }
@@ -1485,6 +1494,7 @@ async function startSearch() {
                         renderResults(data.grouped, data.total, lastSourceUrl);
                         jsonBox.textContent = JSON.stringify(data.grouped, null, 2);
                         exportBar.classList.add('visible');
+                        playSearchSound();
                         loadMemoryList();
                     }
                 }
@@ -1838,7 +1848,8 @@ async function exportClip() {
         if (data.error) {
             setClipStatus('Error: ' + data.error, 'error');
         } else {
-            setClipStatus('<span class="clip-done-icon">\u2713</span> Saved <strong>' + escHtml(data.filename) + '</strong> \u2014 ' + data.file_size_mb + ' MB, ' + data.duration_formatted, 'success');
+            const revealLink = '<a href="#" onclick="event.preventDefault();revealClip(\'' + escHtml(data.clip_path).replace(/'/g, "\\'") + '\')">Reveal in Finder</a>';
+            setClipStatus('<span class="clip-done-icon">\u2713</span> Saved <strong>' + escHtml(data.filename) + '</strong> \u2014 ' + data.file_size_mb + ' MB, ' + data.duration_formatted + ' &middot; ' + revealLink, 'success');
             playExportSound();
             if (document.getElementById('view-clips')) loadClipsList();
         }
@@ -2090,26 +2101,27 @@ async function loadClipsList() {
         statsEl.textContent = clips.length + ' clip' + (clips.length !== 1 ? 's' : '');
 
         if (clips.length === 0) {
-            body.innerHTML = '<div class="clips-empty">No clip exports yet.<br>Use the clip export tool to save video segments.</div>';
+            body.innerHTML = '<div class="clips-grid"><div class="clips-empty">No clip exports yet.<br>Use the clip export tool to save video segments.</div></div>';
             return;
         }
 
-        let html = '';
-        for (let i = 0; i < clips.length; i++) {
-            const c = clips[i];
-            html += '<div class="clip-card" data-index="' + i + '">';
-            html += '<div class="clip-info">';
+        // Newest first
+        let indexed = clips.map((c, i) => ({...c, _i: i})).reverse();
+        let html = '<div class="clips-grid">';
+        for (const c of indexed) {
+            html += '<div class="clip-card" data-index="' + c._i + '">';
             html += '<div class="clip-title">' + escHtml(c.title) + '</div>';
             html += '<div class="clip-meta">';
             html += '<span>' + escHtml(c.duration_formatted) + '</span>';
             html += '<span class="pill">' + c.file_size_mb + ' MB</span>';
             html += '<span>' + escHtml(c.date) + '</span>';
-            html += '</div></div>';
+            html += '</div>';
             html += '<div class="clip-actions">';
             html += '<button onclick="revealClip(\'' + escHtml(c.path).replace(/'/g, "\\'") + '\')" title="Show in Finder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>';
-            html += '<button onclick="deleteClip(' + i + ', this)" title="Remove from list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
+            html += '<button onclick="deleteClip(' + c._i + ', this)" title="Remove from list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
             html += '</div></div>';
         }
+        html += '</div>';
         body.innerHTML = html;
     } catch (err) {
         body.innerHTML = '<div class="clips-empty">Error loading clips</div>';
@@ -2161,6 +2173,24 @@ function playExportSound() {
     gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.15);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     osc.stop(ctx.currentTime + 0.3);
+}
+
+function playSearchSound() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Soft low tone — distinct from the higher export chime
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0.12;
+    osc.frequency.setValueAtTime(523, ctx.currentTime);       // C5
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.12); // E5
+    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.24); // G5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
 }
 
 /* ============ STATE PERSISTENCE ============ */
