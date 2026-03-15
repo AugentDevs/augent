@@ -200,6 +200,10 @@ textarea {
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
+textarea::-webkit-resizer {
+    background: linear-gradient(135deg, transparent 60%, var(--green-dim) 60%, var(--green-dim) 65%, transparent 65%, transparent 75%, var(--green-dim) 75%, var(--green-dim) 80%, transparent 80%);
+    border: none;
+}
 input[type="text"]::placeholder, textarea::placeholder { color: var(--green-hint); }
 input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--green-border-hover); }
 
@@ -261,6 +265,12 @@ select option { background:var(--black); color:var(--green); }
 
 /* WaveSurfer */
 .waveform-wrap { display:none; margin-top:10px; border:1px solid var(--green-border); border-radius:12px; padding:10px 12px; }
+.waveform-title {
+    display:none; font-size:12px; font-weight:600; color:var(--green);
+    margin-bottom:6px; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis;
+}
+.waveform-title.visible { display:block; }
 .waveform-wrap.visible { display:block; }
 #waveform { width:100%; height:48px; cursor:pointer; }
 .waveform-loader { display:flex; align-items:center; gap:8px; height:48px; padding-left:4px; }
@@ -1024,6 +1034,7 @@ select option { background:var(--black); color:var(--green); }
             </div>
             <div class="hint">Or paste a video/audio URL instead of uploading</div>
             <div class="waveform-wrap" id="waveformWrap">
+                <div class="waveform-title" id="waveformTitle"></div>
                 <div class="waveform-loader" id="waveformLoader">
                     <div class="waveform-loader-bars"><div class="waveform-loader-bar"></div><div class="waveform-loader-bar"></div><div class="waveform-loader-bar"></div><div class="waveform-loader-bar"></div><div class="waveform-loader-bar"></div></div>
                     <span style="color:var(--green);font-size:12px;opacity:0.7;">Loading audio...</span>
@@ -1249,6 +1260,7 @@ function setFile(file) {
     document.getElementById('audioUrl').value = '';
     document.getElementById('urlWrap').classList.remove('has-url');
     loadWaveform(URL.createObjectURL(file));
+    setWaveformTitle(file.name.replace(/\.[^.]+$/, ''));
     saveState();
 }
 
@@ -1261,6 +1273,7 @@ function clearFile() {
     if (wavesurfer) { wavesurfer.destroy(); wavesurfer = null; }
     regionsPlugin = null; clipRegion = null; hideClipToolbar();
     waveformWrap.classList.remove('visible');
+    setWaveformTitle('');
     saveState();
 }
 
@@ -1346,6 +1359,12 @@ function loadWaveform(url) {
     wavesurfer.on('finish', () => { playBtn.innerHTML = '&#9654;'; });
 }
 
+function setWaveformTitle(title) {
+    const el = document.getElementById('waveformTitle');
+    if (title) { el.textContent = title; el.classList.add('visible'); }
+    else { el.textContent = ''; el.classList.remove('visible'); }
+}
+
 function togglePlay() { if (wavesurfer) wavesurfer.playPause(); }
 function waveSkipStart() { if (wavesurfer) wavesurfer.seekTo(0); }
 function waveSkipEnd() { if (wavesurfer) wavesurfer.seekTo(1); }
@@ -1414,7 +1433,7 @@ async function startSearch() {
                         else if (data.type === 'box') appendBox(data.lines, data.banner || false);
                         else if (data.type === 'status') resultsContent.innerHTML = '<p>' + data.text + '</p>';
                         else if (data.type === 'btn_text') btn.textContent = data.text;
-                        else if (data.type === 'audio_url') loadWaveform(data.url);
+                        else if (data.type === 'audio_url') { loadWaveform(data.url); setWaveformTitle(data.title || ''); }
                         else if (data.type === 'results') {
                             hideProgress(); hideSpinner();
                             lastGrouped = data.grouped;
@@ -1466,7 +1485,7 @@ async function startSearch() {
                         else if (data.type === 'btn_text') btn.textContent = data.text;
                         else if (data.type === 'progress') showProgress(data.pct, data.label);
                         else if (data.type === 'spinner') showSpinner(data.label);
-                        else if (data.type === 'audio_url') loadWaveform(data.url);
+                        else if (data.type === 'audio_url') { loadWaveform(data.url); setWaveformTitle(data.title || ''); }
                         else if (data.type === 'results') {
                             hideProgress(); hideSpinner();
                             lastGrouped = data.grouped;
@@ -2881,9 +2900,11 @@ async def download_and_search(request: Request):
                 "log", text=f"  [download] complete: {os.path.basename(audio_path)}"
             )
             audio_token = _register_audio(audio_path)
+            audio_title = os.path.splitext(os.path.basename(audio_path))[0]
             yield send(
                 "audio_url",
                 url=f"/api/audio?token={audio_token}",
+                title=audio_title,
             )
             yield send("log", text="")
 
