@@ -3230,8 +3230,20 @@ async def api_clips_reveal(request: Request):
     body = await request.json()
     file_path = body.get("path", "")
 
-    if not file_path or not os.path.exists(file_path):
+    if not file_path:
+        return JSONResponse({"error": "No path provided"}, status_code=400)
+
+    # Validate the path is a tracked clip (prevent arbitrary path access)
+    real_path = os.path.realpath(file_path)
+    clips = _load_clips()
+    tracked_paths = {os.path.realpath(c["path"]) for c in clips}
+    if real_path not in tracked_paths:
+        return JSONResponse({"error": "Not a tracked clip"}, status_code=403)
+
+    if not os.path.isfile(real_path):
         return JSONResponse({"error": "File not found"}, status_code=404)
+
+    file_path = real_path
 
     try:
         if platform.system() == "Darwin":
