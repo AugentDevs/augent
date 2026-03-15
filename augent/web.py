@@ -1983,11 +1983,19 @@ async def serve_banner():
         return Response(content=f.read(), media_type="image/png")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def index():
     from . import __version__
 
-    return HTML_PAGE.replace("{{AUGENT_VERSION}}", __version__)
+    content = HTML_PAGE.replace("{{AUGENT_VERSION}}", __version__)
+    return HTMLResponse(
+        content=content,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.post("/api/search")
