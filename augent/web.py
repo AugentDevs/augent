@@ -3057,14 +3057,15 @@ async def clip_export(request: Request):
     base = os.path.join(output_dir, f"{safe_title}_clip")
     ext = ".mp4"
     if not os.path.exists(base + ext):
-        out_filename = f"{safe_title}_clip{ext}"
+        out_stem = f"{safe_title}_clip"
     else:
         counter = 2
-        while os.path.exists(f"{base}_{counter}{ext}"):
+        while os.path.exists(os.path.join(output_dir, f"{safe_title}_clip_{counter}{ext}")):
             counter += 1
-        out_filename = f"{safe_title}_clip_{counter}{ext}"
+        out_stem = f"{safe_title}_clip_{counter}"
 
-    out_path = os.path.join(output_dir, out_filename)
+    # Use %(ext)s so yt-dlp controls the extension during merge
+    out_template = os.path.join(output_dir, f"{out_stem}.%(ext)s")
 
     cmd = [
         ytdlp,
@@ -3077,7 +3078,9 @@ async def clip_export(request: Request):
         "mp4",
         "--no-playlist",
         "-o",
-        out_path,
+        out_template,
+        "--print",
+        "after_move:filepath",
         url,
     ]
 
@@ -3091,6 +3094,10 @@ async def clip_export(request: Request):
     if result.returncode != 0:
         error_msg = result.stderr.strip()[-200:] if result.stderr else "Unknown error"
         return JSONResponse({"error": f"yt-dlp failed: {error_msg}"})
+
+    # Get actual output path from yt-dlp's --print
+    output_lines = result.stdout.strip().split("\n")
+    out_path = output_lines[-1] if output_lines else os.path.join(output_dir, f"{out_stem}.mp4")
 
     if not os.path.exists(out_path):
         return JSONResponse({"error": "Clip file not found after export"})
