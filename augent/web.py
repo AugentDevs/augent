@@ -83,6 +83,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/wavesurfer.js@7"></script>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
@@ -506,6 +507,92 @@ select option { background:var(--black); color:var(--green); }
     margin-top:12px; font-size:12px; color:var(--green-dim);
 }
 
+/* Clip toolbar (below waveform) */
+.clip-toolbar {
+    display:none; margin-top:10px; padding:12px 14px;
+    border:1px solid var(--green-border-hover); border-radius:12px;
+    background:rgba(0,240,96,0.03);
+    animation: clipToolbarIn 0.2s ease-out;
+}
+@keyframes clipToolbarIn {
+    from { opacity:0; transform:translateY(-6px); }
+    to { opacity:1; transform:translateY(0); }
+}
+.clip-toolbar.visible { display:block; }
+.clip-toolbar-header {
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;
+}
+.clip-toolbar-title {
+    font-size:12px; font-weight:700; letter-spacing:0.5px; color:var(--green);
+}
+.clip-toolbar-close {
+    background:none; border:none; color:var(--green-dim); cursor:pointer;
+    font-size:16px; padding:0 4px; transition:color 0.15s;
+}
+.clip-toolbar-close:hover { color:var(--green); }
+.clip-toolbar-row {
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.clip-edge-group {
+    display:flex; align-items:center; gap:4px;
+}
+.clip-edge-label {
+    font-size:11px; font-weight:600; color:var(--green-dim); min-width:32px;
+}
+.clip-edge-time {
+    font-family:var(--mono); font-size:13px; color:var(--green);
+    background:rgba(0,240,96,0.06); border:1px solid var(--green-border);
+    border-radius:6px; padding:4px 8px; min-width:52px; text-align:center;
+}
+.clip-nudge {
+    background:none; border:1px solid var(--green-border); color:var(--green);
+    font-family:var(--mono); font-size:10px; padding:3px 6px; border-radius:4px;
+    cursor:pointer; transition:all 0.12s; white-space:nowrap;
+}
+.clip-nudge:hover { border-color:var(--green); background:var(--green-hover); }
+.clip-sep {
+    width:1px; height:20px; background:var(--green-border); flex-shrink:0;
+}
+.clip-duration {
+    font-family:var(--mono); font-size:12px; color:var(--green-dim);
+}
+.clip-toolbar-actions {
+    display:flex; align-items:center; gap:8px; margin-left:auto;
+}
+.clip-preview-btn {
+    background:none; border:1px solid var(--green-border); color:var(--green);
+    font-family:var(--sans); font-size:12px; font-weight:600; padding:6px 14px;
+    border-radius:8px; cursor:pointer; transition:all 0.15s;
+    display:flex; align-items:center; gap:5px;
+}
+.clip-preview-btn:hover { border-color:var(--green); background:var(--green-hover); }
+.clip-preview-btn.playing { border-color:var(--green); background:rgba(0,240,96,0.12); }
+.clip-export-btn {
+    background:var(--green); border:1px solid var(--green); color:var(--black);
+    font-family:var(--sans); font-size:12px; font-weight:700; padding:6px 16px;
+    border-radius:8px; cursor:pointer; transition:all 0.15s;
+    display:flex; align-items:center; gap:5px;
+}
+.clip-export-btn:hover { box-shadow:0 4px 14px rgba(0,240,96,0.25); transform:translateY(-1px); }
+.clip-export-btn:active { transform:translateY(0); }
+.clip-export-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none; }
+.clip-status-bar {
+    margin-top:8px; font-size:12px; color:var(--green-dim);
+    display:none; align-items:center; gap:8px;
+}
+.clip-status-bar.visible { display:flex; }
+.clip-status-bar a { color:var(--green); text-decoration:none; font-weight:600; }
+.clip-status-bar a:hover { text-decoration:underline; }
+.clip-status-bar .clip-done-icon { color:var(--green); font-size:14px; }
+.clip-keyboard-hint {
+    font-size:10px; color:var(--green-hint); margin-top:6px;
+    font-family:var(--mono);
+}
+.clip-keyboard-hint kbd {
+    background:rgba(0,240,96,0.08); border:1px solid var(--green-border);
+    border-radius:3px; padding:1px 5px; font-size:10px;
+}
+
 /* ======== MEMORY VIEW ======== */
 .memory-view {
     flex-direction: column;
@@ -788,6 +875,49 @@ select option { background:var(--black); color:var(--green); }
                     </div>
                 </div>
             </div>
+
+            <!-- Clip Export Toolbar -->
+            <div class="clip-toolbar" id="clipToolbar">
+                <div class="clip-toolbar-header">
+                    <span class="clip-toolbar-title">CLIP EXPORT</span>
+                    <button class="clip-toolbar-close" onclick="clearClipRegion()" title="Close">&times;</button>
+                </div>
+                <div class="clip-toolbar-row">
+                    <div class="clip-edge-group">
+                        <span class="clip-edge-label">Start</span>
+                        <button class="clip-nudge" onclick="nudgeClip('start',-5)">-5s</button>
+                        <button class="clip-nudge" onclick="nudgeClip('start',-1)">-1s</button>
+                        <span class="clip-edge-time" id="clipStartTime">0:00</span>
+                        <button class="clip-nudge" onclick="nudgeClip('start',1)">+1s</button>
+                        <button class="clip-nudge" onclick="nudgeClip('start',5)">+5s</button>
+                    </div>
+                    <div class="clip-sep"></div>
+                    <div class="clip-edge-group">
+                        <span class="clip-edge-label">End</span>
+                        <button class="clip-nudge" onclick="nudgeClip('end',-5)">-5s</button>
+                        <button class="clip-nudge" onclick="nudgeClip('end',-1)">-1s</button>
+                        <span class="clip-edge-time" id="clipEndTime">0:00</span>
+                        <button class="clip-nudge" onclick="nudgeClip('end',1)">+1s</button>
+                        <button class="clip-nudge" onclick="nudgeClip('end',5)">+5s</button>
+                    </div>
+                    <div class="clip-sep"></div>
+                    <span class="clip-duration" id="clipDuration">0s</span>
+                    <div class="clip-toolbar-actions">
+                        <button class="clip-preview-btn" id="clipPreviewBtn" onclick="previewClip()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            Preview
+                        </button>
+                        <button class="clip-export-btn" id="clipExportBtn" onclick="exportClip()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export MP4
+                        </button>
+                    </div>
+                </div>
+                <div class="clip-status-bar" id="clipStatusBar"></div>
+                <div class="clip-keyboard-hint">
+                    <kbd>Space</kbd> preview &middot; <kbd>Enter</kbd> export &middot; <kbd>Esc</kbd> close &middot; drag region edges to adjust
+                </div>
+            </div>
         </div>
 
         <div>
@@ -812,9 +942,14 @@ select option { background:var(--black); color:var(--green); }
 
         <div class="tips">
             <strong>Tips:</strong>
-            <span class="tip-line">&#183; Paste a YouTube or video URL to download audio directly</span>
-            <span class="tip-line">&#183; Results stored in memory for instant re-search</span>
+            <span class="tip-line">&#183; Click the film icon on any result to create a clip export</span>
+            <span class="tip-line">&#183; Drag on the waveform to select a custom clip range</span>
+            <span class="tip-line">&#183; Use nudge buttons to fine-tune clip boundaries by 1s or 5s</span>
+            <span class="tip-line">&#183; Preview your clip before exporting to hear exactly what you'll get</span>
+            <span class="tip-line">&#183; Results stored in memory — switch to Memory tab to re-search instantly</span>
             <span class="tip-line">&#183; Open multiple tabs for parallel processing</span>
+            <span class="tip-line">&#183; Paste a YouTube URL to get clickable timestamps on every match</span>
+            <span class="tip-line">&#183; Use Memory search to find keywords across all your transcriptions</span>
         </div>
     </div>
 
@@ -941,6 +1076,7 @@ function clearFile() {
     uploadLabel.textContent = 'Drop audio file or click to upload';
     uploadZone.classList.remove('has-file');
     if (wavesurfer) { wavesurfer.destroy(); wavesurfer = null; }
+    regionsPlugin = null; clipRegion = null; hideClipToolbar();
     waveformWrap.classList.remove('visible');
     saveState();
 }
@@ -949,6 +1085,7 @@ function clearUrl() {
     document.getElementById('audioUrl').value = '';
     document.getElementById('urlWrap').classList.remove('has-url');
     if (wavesurfer) { wavesurfer.destroy(); wavesurfer = null; }
+    regionsPlugin = null; clipRegion = null; hideClipToolbar();
     waveformWrap.classList.remove('visible');
     saveState();
 }
@@ -987,6 +1124,7 @@ function searchFromMemory(cardEl) {
 
 function loadWaveform(url) {
     if (wavesurfer) { wavesurfer.destroy(); wavesurfer = null; }
+    regionsPlugin = null; clipRegion = null; hideClipToolbar();
     const loader = document.getElementById('waveformLoader');
     loader.style.display = 'flex';
     document.getElementById('waveform').style.display = 'none';
@@ -1010,6 +1148,7 @@ function loadWaveform(url) {
         loader.style.display = 'none';
         document.getElementById('waveform').style.display = 'block';
         timeEl.textContent = '0:00 / ' + fmtTime(wavesurfer.getDuration());
+        initRegionsPlugin();
     });
     wavesurfer.on('audioprocess', () => {
         timeEl.textContent = fmtTime(wavesurfer.getCurrentTime()) + ' / ' + fmtTime(wavesurfer.getDuration());
@@ -1337,60 +1476,178 @@ function exportAs(format) {
     window.location.href = '/api/export?format=' + format + '&keywords=' + encodeURIComponent(keywords);
 }
 
-/* ============ CLIP EXPORT ============ */
+/* ============ CLIP EXPORT (WaveSurfer Regions) ============ */
+let regionsPlugin = null;
+let clipRegion = null;
+let clipSourceUrl = '';
+let clipPreviewPlaying = false;
+let clipPreviewTimeout = null;
+
 function fmtSec(s) {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return m + ':' + String(sec).padStart(2, '0');
 }
 
-function parseMmSs(str) {
-    const parts = str.trim().split(':');
-    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    if (parts.length === 3) return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-    return parseFloat(str) || 0;
+function initRegionsPlugin() {
+    if (regionsPlugin || !wavesurfer) return;
+    regionsPlugin = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+
+    // Allow drag-to-select on the waveform to create a clip region
+    regionsPlugin.enableDragSelection({
+        color: 'rgba(0, 240, 96, 0.15)',
+    });
+
+    // Track new regions from drag-selection
+    regionsPlugin.on('region-created', (region) => {
+        // Only allow one region — remove old one
+        if (clipRegion && clipRegion.id !== region.id) {
+            try { clipRegion.remove(); } catch(e) {}
+        }
+        clipRegion = region;
+        region.setOptions({ color: 'rgba(0, 240, 96, 0.15)', drag: true, resize: true });
+        clipSourceUrl = lastSourceUrl || document.getElementById('audioUrl').value.trim();
+        updateClipToolbar();
+        showClipToolbar();
+    });
+
+    regionsPlugin.on('region-updated', () => {
+        updateClipToolbar();
+    });
 }
 
+let _clipFromResult = false;
 function openClipModal(url, timestampSec, keyword) {
-    const padding = 10;
-    const start = Math.max(0, timestampSec - padding);
-    const end = timestampSec + padding;
+    // Instead of a modal, create/move a region on the waveform and show the toolbar
+    if (!wavesurfer) {
+        alert('Load audio first to use clip export');
+        return;
+    }
+    initRegionsPlugin();
 
-    const modal = document.createElement('div');
-    modal.className = 'clip-modal';
-    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-    modal.innerHTML =
-        '<div class="clip-modal-box">' +
-        '<h3>Export Video Clip</h3>' +
-        '<label>Source</label>' +
-        '<input type="text" id="clipUrl" value="' + escHtml(url) + '" readonly style="opacity:0.6;">' +
-        '<label>Keyword match at ' + fmtSec(timestampSec) + ' (' + escHtml(keyword) + ')</label>' +
-        '<div style="display:flex;gap:12px;">' +
-        '<div style="flex:1;"><label>Start</label><input type="text" id="clipStart" value="' + fmtSec(start) + '"></div>' +
-        '<div style="flex:1;"><label>End</label><input type="text" id="clipEnd" value="' + fmtSec(end) + '"></div>' +
-        '</div>' +
-        '<div class="clip-actions">' +
-        '<button class="clip-cancel" onclick="this.closest(\'.clip-modal\').remove()">Cancel</button>' +
-        '<button class="clip-go" onclick="doClipExport(this.closest(\'.clip-modal\'))">Export MP4</button>' +
-        '</div>' +
-        '<div class="clip-status" id="clipStatus"></div>' +
-        '</div>';
-    document.body.appendChild(modal);
-    document.getElementById('clipStart').focus();
+    const padding = 10;
+    const duration = wavesurfer.getDuration() || 9999;
+    const start = Math.max(0, timestampSec - padding);
+    const end = Math.min(duration, timestampSec + padding);
+
+    // Remove existing region without triggering toolbar hide
+    if (clipRegion) { try { clipRegion.remove(); } catch(e) {} }
+    clipRegion = null;
+
+    clipSourceUrl = url;
+    _clipFromResult = true;
+
+    // Create new region (region-created event will fire but we already set clipSourceUrl)
+    clipRegion = regionsPlugin.addRegion({
+        start: start,
+        end: end,
+        color: 'rgba(0, 240, 96, 0.15)',
+        drag: true,
+        resize: true,
+    });
+
+    _clipFromResult = false;
+
+    // Scroll waveform to the region
+    wavesurfer.seekTo(Math.max(0, start / duration));
+
+    updateClipToolbar();
+    showClipToolbar();
 }
 
-async function doClipExport(modal) {
-    const url = document.getElementById('clipUrl').value;
-    const start = parseMmSs(document.getElementById('clipStart').value);
-    const end = parseMmSs(document.getElementById('clipEnd').value);
-    const status = document.getElementById('clipStatus');
-    const goBtn = modal.querySelector('.clip-go');
+function showClipToolbar() {
+    document.getElementById('clipToolbar').classList.add('visible');
+}
 
-    if (end <= start) { status.textContent = 'End must be after start'; return; }
+function hideClipToolbar() {
+    document.getElementById('clipToolbar').classList.remove('visible');
+    const statusBar = document.getElementById('clipStatusBar');
+    statusBar.classList.remove('visible');
+    statusBar.innerHTML = '';
+}
 
-    goBtn.disabled = true;
-    goBtn.textContent = 'Exporting...';
-    status.textContent = 'Downloading clip (' + fmtSec(start) + ' → ' + fmtSec(end) + ')...';
+function clearClipRegion() {
+    if (clipRegion) { clipRegion.remove(); clipRegion = null; }
+    hideClipToolbar();
+    stopClipPreview();
+}
+
+function updateClipToolbar() {
+    if (!clipRegion) return;
+    const s = clipRegion.start;
+    const e = clipRegion.end;
+    document.getElementById('clipStartTime').textContent = fmtSec(s);
+    document.getElementById('clipEndTime').textContent = fmtSec(e);
+    const dur = e - s;
+    document.getElementById('clipDuration').textContent = dur < 60 ? Math.round(dur) + 's' : fmtSec(dur);
+}
+
+function nudgeClip(edge, delta) {
+    if (!clipRegion || !wavesurfer) return;
+    const duration = wavesurfer.getDuration() || 9999;
+    let s = clipRegion.start;
+    let e = clipRegion.end;
+    if (edge === 'start') {
+        s = Math.max(0, Math.min(e - 1, s + delta));
+    } else {
+        e = Math.min(duration, Math.max(s + 1, e + delta));
+    }
+    clipRegion.setOptions({ start: s, end: e });
+    updateClipToolbar();
+}
+
+function previewClip() {
+    if (!clipRegion || !wavesurfer) return;
+    const btn = document.getElementById('clipPreviewBtn');
+
+    if (clipPreviewPlaying) {
+        stopClipPreview();
+        return;
+    }
+
+    clipPreviewPlaying = true;
+    btn.classList.add('playing');
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16"/><rect x="14" y="4" width="5" height="16"/></svg> Stop';
+
+    // Seek to region start and play
+    wavesurfer.seekTo(clipRegion.start / wavesurfer.getDuration());
+    wavesurfer.play();
+
+    // Stop when reaching end of region
+    const checkEnd = () => {
+        if (!clipPreviewPlaying) return;
+        if (wavesurfer.getCurrentTime() >= clipRegion.end) {
+            stopClipPreview();
+            return;
+        }
+        clipPreviewTimeout = requestAnimationFrame(checkEnd);
+    };
+    clipPreviewTimeout = requestAnimationFrame(checkEnd);
+}
+
+function stopClipPreview() {
+    clipPreviewPlaying = false;
+    if (clipPreviewTimeout) cancelAnimationFrame(clipPreviewTimeout);
+    if (wavesurfer && wavesurfer.isPlaying()) wavesurfer.pause();
+    const btn = document.getElementById('clipPreviewBtn');
+    btn.classList.remove('playing');
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Preview';
+}
+
+async function exportClip() {
+    if (!clipRegion) return;
+    const url = clipSourceUrl || document.getElementById('audioUrl').value.trim();
+    if (!url) {
+        setClipStatus('No source URL — clip export requires a video URL', 'error');
+        return;
+    }
+
+    const start = clipRegion.start;
+    const end = clipRegion.end;
+    const btn = document.getElementById('clipExportBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="wormhole-spinner" style="width:12px;height:12px;" viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="16 40"/></svg> Exporting...';
+    setClipStatus('Downloading clip ' + fmtSec(start) + ' \u2192 ' + fmtSec(end) + '...', 'loading');
 
     try {
         const resp = await fetch('/api/clip-export', {
@@ -1400,20 +1657,36 @@ async function doClipExport(modal) {
         });
         const data = await resp.json();
         if (data.error) {
-            status.textContent = 'Error: ' + data.error;
-            goBtn.disabled = false;
-            goBtn.textContent = 'Export MP4';
+            setClipStatus('Error: ' + data.error, 'error');
         } else {
-            status.innerHTML = 'Saved: <strong>' + escHtml(data.filename) + '</strong> (' + data.file_size_mb + ' MB, ' + data.duration_formatted + ')';
-            goBtn.textContent = 'Done!';
-            setTimeout(() => modal.remove(), 3000);
+            setClipStatus('<span class="clip-done-icon">\u2713</span> Saved <strong>' + escHtml(data.filename) + '</strong> \u2014 ' + data.file_size_mb + ' MB, ' + data.duration_formatted, 'success');
         }
     } catch (err) {
-        status.textContent = 'Error: ' + err.message;
-        goBtn.disabled = false;
-        goBtn.textContent = 'Export MP4';
+        setClipStatus('Error: ' + err.message, 'error');
     }
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export MP4';
 }
+
+function setClipStatus(html, type) {
+    const bar = document.getElementById('clipStatusBar');
+    bar.innerHTML = html;
+    bar.classList.add('visible');
+    bar.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? 'var(--green)' : 'var(--green-dim)';
+}
+
+// Keyboard shortcuts for clip toolbar
+document.addEventListener('keydown', (e) => {
+    const toolbar = document.getElementById('clipToolbar');
+    if (!toolbar.classList.contains('visible')) return;
+    // Don't intercept when user is typing in an input/textarea
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+    if (e.key === ' ') { e.preventDefault(); previewClip(); }
+    else if (e.key === 'Enter') { e.preventDefault(); exportClip(); }
+    else if (e.key === 'Escape') { e.preventDefault(); clearClipRegion(); }
+});
 
 /* ============ MEMORY VIEW ============ */
 let memoryDebounce = null;
