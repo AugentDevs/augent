@@ -3226,7 +3226,14 @@ def main():
         f"\n  WebUI is live at \033]8;;http://localhost:{args.port}\033\\http://localhost:{args.port}\033]8;;\033\\\n  Press Ctrl+C to stop.\n\n".encode(),
     )
 
-    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
+    uvicorn.run(
+        "augent.web:app",
+        host="0.0.0.0",
+        port=args.port,
+        log_level="warning",
+        reload=True,
+        reload_dirs=[os.path.dirname(__file__)],
+    )
 
 
 if __name__ == "__main__":
