@@ -3089,7 +3089,11 @@ async def clip_export(request: Request):
         title_result = await asyncio.to_thread(
             subprocess.run, title_cmd, capture_output=True, text=True, timeout=30
         )
-        raw_title = title_result.stdout.strip().split("\n")[0] if title_result.returncode == 0 else ""
+        raw_title = (
+            title_result.stdout.strip().split("\n")[0]
+            if title_result.returncode == 0
+            else ""
+        )
     except Exception:
         raw_title = ""
 
@@ -3097,7 +3101,7 @@ async def clip_export(request: Request):
         raw_title = "clip"
 
     # Sanitize title for filesystem
-    safe_title = re.sub(r'[<>:"/\\|?*]', '_', raw_title).strip().rstrip('.')
+    safe_title = re.sub(r'[<>:"/\\|?*]', "_", raw_title).strip().rstrip(".")
 
     # Find next available filename
     base = os.path.join(output_dir, f"{safe_title}_clip")
@@ -3106,7 +3110,9 @@ async def clip_export(request: Request):
         out_stem = f"{safe_title}_clip"
     else:
         counter = 2
-        while os.path.exists(os.path.join(output_dir, f"{safe_title}_clip_{counter}{ext}")):
+        while os.path.exists(
+            os.path.join(output_dir, f"{safe_title}_clip_{counter}{ext}")
+        ):
             counter += 1
         out_stem = f"{safe_title}_clip_{counter}"
 
@@ -3143,7 +3149,11 @@ async def clip_export(request: Request):
 
     # Get actual output path from yt-dlp's --print
     output_lines = result.stdout.strip().split("\n")
-    out_path = output_lines[-1] if output_lines else os.path.join(output_dir, f"{out_stem}.mp4")
+    out_path = (
+        output_lines[-1]
+        if output_lines
+        else os.path.join(output_dir, f"{out_stem}.mp4")
+    )
 
     if not os.path.exists(out_path):
         return JSONResponse({"error": "Clip file not found after export"})
