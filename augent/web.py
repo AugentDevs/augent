@@ -34,9 +34,12 @@ _latest_results_lock = asyncio.Lock()
 
 
 def format_time(seconds: float) -> str:
-    mins = int(seconds // 60)
-    secs = int(seconds % 60)
-    return f"{mins}:{secs:02d}"
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    if h > 0:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
 
 
 def format_time_srt(seconds: float) -> str:
@@ -82,8 +85,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <link rel="icon" type="image/png" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/wavesurfer.js@7"></script>
-<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@7.8.0"></script>
+<script src="https://unpkg.com/wavesurfer.js@7.8.0/dist/plugins/regions.min.js"></script>
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
@@ -728,22 +731,26 @@ select option { background:var(--black); color:var(--green); }
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
-    color: var(--green-dim);
+    font-size: 12px;
+    color: var(--green);
+    font-weight: 500;
+}
+.memory-card .card-meta .duration {
+    font-weight: 700;
 }
 .memory-card .card-meta .pill {
     background: rgba(0,240,96,0.08);
     border: 1px solid var(--green-border);
     padding: 2px 8px;
     border-radius: 6px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--green);
 }
 .memory-card .card-meta .yt-icon {
     color: #FF0000;
     font-weight: 700;
-    font-size: 10px;
+    font-size: 11px;
 }
 .memory-card { position: relative; }
 .memory-card .card-actions {
@@ -787,7 +794,8 @@ select option { background:var(--black); color:var(--green); }
 
 .detail-header {
     padding: 20px 24px;
-    border-bottom: 1px solid var(--green-border);
+    border-bottom: 2px solid var(--green-border-hover);
+    margin-bottom: 4px;
 }
 .detail-header h2 {
     font-size: 20px;
@@ -798,16 +806,19 @@ select option { background:var(--black); color:var(--green); }
 .detail-meta {
     display: flex;
     align-items: center;
-    gap: 16px;
-    font-size: 12px;
-    color: var(--green-dim);
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--green);
     flex-wrap: wrap;
 }
 .detail-meta a {
     color: var(--green);
-    text-decoration: none;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
 }
-.detail-meta a:hover { text-decoration: underline; }
+.detail-meta a:hover { color: #fff; }
 
 .detail-actions {
     display: flex;
@@ -830,6 +841,24 @@ select option { background:var(--black); color:var(--green); }
     border-color: var(--green-border-hover);
     background: var(--green-hover);
 }
+.detail-source-btn {
+    padding: 6px 16px;
+    background: var(--black);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.detail-source-btn:hover {
+    border-color: var(--green-border-hover);
+    background: var(--green-hover);
+    color: var(--green);
+}
 
 .detail-transcript {
     flex: 1;
@@ -838,6 +867,7 @@ select option { background:var(--black); color:var(--green); }
 }
 .detail-transcript .seg-row {
     display: flex;
+    align-items: baseline;
     gap: 16px;
     padding: 8px 0;
     border-bottom: 1px solid var(--green-border);
@@ -848,11 +878,10 @@ select option { background:var(--black); color:var(--green); }
 }
 .detail-transcript .seg-ts {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 13px;
     color: var(--green-dim);
     white-space: nowrap;
     min-width: 50px;
-    padding-top: 2px;
 }
 .detail-transcript .seg-ts a {
     color: var(--green);
@@ -1983,7 +2012,7 @@ async function loadMemoryList() {
             html += '</div>';
             html += '<div class="card-title">' + escHtml(item.title) + '</div>';
             html += '<div class="card-meta">';
-            html += '<span>' + escHtml(item.duration_formatted) + '</span>';
+            html += '<span class="duration">' + escHtml(item.duration_formatted) + '</span>';
             html += '<span class="pill">' + escHtml(item.model_size) + '</span>';
             html += ytBadge;
             html += '<span>' + escHtml(item.date) + '</span>';
@@ -2019,7 +2048,7 @@ async function loadMemoryDetail(cacheKey, cardEl) {
 
         let sourceHtml = '';
         if (d.source_url) {
-            sourceHtml = ' &middot; <a href="' + escHtml(d.source_url) + '" target="_blank" rel="noopener">Source</a>';
+            sourceHtml = '<a class="detail-source-btn" href="' + escHtml(d.source_url) + '" target="_blank" rel="noopener">Source →</a>';
         }
 
         let segsHtml = '';
@@ -2040,8 +2069,9 @@ async function loadMemoryDetail(cacheKey, cardEl) {
 
         panel.innerHTML = '<div class="detail-header">' +
             '<h2>' + escHtml(d.title) + '</h2>' +
-            '<div class="detail-meta">' + metaParts.join(' &middot; ') + sourceHtml + '</div>' +
+            '<div class="detail-meta">' + metaParts.join(' &middot; ') + '</div>' +
             '<div class="detail-actions">' +
+            sourceHtml +
             '<button onclick="shareTranscript()">Share as HTML</button>' +
             (d.file_path ? '<button onclick="showInFinder()">Show Audio</button>' : '') +
             '<button onclick="showTranscript()">Show Transcript</button>' +
@@ -3181,7 +3211,7 @@ async def clip_export(request: Request):
 
     file_size = os.path.getsize(out_path)
     duration = end - start
-    duration_formatted = f"{int(duration // 60)}:{int(duration % 60):02d}"
+    duration_formatted = format_time(duration)
     file_size_mb = round(file_size / (1024 * 1024), 2)
 
     # Track clip in clips.json
@@ -3413,8 +3443,7 @@ async def api_memory_detail(cache_key: str):
         else ""
     )
 
-    mins = int(entry.duration // 60)
-    secs = int(entry.duration % 60)
+    dur_formatted = format_time(entry.duration)
 
     segments = []
     for seg in entry.segments:
@@ -3437,7 +3466,7 @@ async def api_memory_detail(cache_key: str):
         {
             "title": entry.title,
             "duration": entry.duration,
-            "duration_formatted": f"{mins}:{secs:02d}",
+            "duration_formatted": dur_formatted,
             "language": entry.language,
             "model_size": entry.model_size,
             "date": date_str,
@@ -3631,9 +3660,7 @@ def _generate_share_html(entry) -> str:
     title = html_mod.escape(entry.title or "Untitled")
     language = html_mod.escape(entry.language or "")
     model = html_mod.escape(entry.model_size or "")
-    mins = int(entry.duration // 60)
-    secs = int(entry.duration % 60)
-    duration_fmt = f"{mins}:{secs:02d}"
+    duration_fmt = format_time(entry.duration)
     date_str = (
         datetime.fromtimestamp(entry.created_at).strftime("%Y-%m-%d %H:%M")
         if entry.created_at

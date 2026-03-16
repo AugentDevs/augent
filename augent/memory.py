@@ -678,8 +678,10 @@ class TranscriptionMemory:
                     )
 
                     duration = row["duration"] or 0
-                    mins = int(duration // 60)
-                    secs = int(duration % 60)
+                    h = int(duration // 3600)
+                    m = int((duration % 3600) // 60)
+                    s = int(duration % 60)
+                    dur_fmt = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m}:{s:02d}"
 
                     entries.append(
                         {
@@ -687,7 +689,7 @@ class TranscriptionMemory:
                             "title": row["title"]
                             or os.path.basename(row["file_path"] or ""),
                             "duration": duration,
-                            "duration_formatted": f"{mins}:{secs:02d}",
+                            "duration_formatted": dur_fmt,
                             "date": date_str,
                             "model_size": row["model_size"],
                             "md_path": row["md_path"] or "",
