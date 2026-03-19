@@ -1078,7 +1078,9 @@ class TranscriptionMemory:
                         "INSERT OR IGNORE INTO transcription_tags (cache_key, tag_id, source, created_at) VALUES (?, ?, ?, ?)",
                         (cache_key, tag_id, source, now),
                     )
-                    added.append({"name": tag_name, "category": category, "source": source})
+                    added.append(
+                        {"name": tag_name, "category": category, "source": source}
+                    )
                 conn.commit()
         return added
 
@@ -1143,15 +1145,17 @@ class TranscriptionMemory:
                 m, s = divmod(int(duration), 60)
                 h, m = divmod(m, 60)
                 fmt = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-                results.append({
-                    "cache_key": row[0],
-                    "title": row[1] or "(untitled)",
-                    "duration": duration,
-                    "duration_formatted": fmt,
-                    "model_size": row[3],
-                    "file_path": row[4],
-                    "language": row[5],
-                })
+                results.append(
+                    {
+                        "cache_key": row[0],
+                        "title": row[1] or "(untitled)",
+                        "duration": duration,
+                        "duration_formatted": fmt,
+                        "model_size": row[3],
+                        "file_path": row[4],
+                        "language": row[5],
+                    }
+                )
             return results
 
     _STOPWORDS = frozenset(
@@ -1187,7 +1191,7 @@ class TranscriptionMemory:
             return []
 
         # Strategy 1: Capitalized multi-word phrases (likely proper nouns)
-        cap_phrases = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b', text)
+        cap_phrases = re.findall(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b", text)
         phrase_freq = {}
         for p in cap_phrases:
             p_lower = p.lower()
@@ -1196,7 +1200,7 @@ class TranscriptionMemory:
 
         # Strategy 2: Repeated capitalized single words (not at sentence start)
         # Look for capitalized words NOT after . ! ? or start of text
-        single_caps = re.findall(r'(?<![.!?\n])\s([A-Z][a-z]{2,})\b', text)
+        single_caps = re.findall(r"(?<![.!?\n])\s([A-Z][a-z]{2,})\b", text)
         single_freq = {}
         for w in single_caps:
             w_lower = w.lower()
@@ -1208,13 +1212,23 @@ class TranscriptionMemory:
         freq_tags = {}
         if all_lowercase:
             for w in words:
-                w_clean = re.sub(r'[^a-z]', '', w.lower())
+                w_clean = re.sub(r"[^a-z]", "", w.lower())
                 if len(w_clean) > 3 and w_clean not in self._STOPWORDS:
                     freq_tags[w_clean] = freq_tags.get(w_clean, 0) + 1
 
         # Collect tags with thresholds
         extracted = []
-        company_suffixes = {"inc", "corp", "llc", "ltd", "co", "group", "foundation", "labs", "ai"}
+        company_suffixes = {
+            "inc",
+            "corp",
+            "llc",
+            "ltd",
+            "co",
+            "group",
+            "foundation",
+            "labs",
+            "ai",
+        }
 
         # Multi-word phrases (threshold: 2+)
         for phrase, count in phrase_freq.items():
@@ -1233,7 +1247,9 @@ class TranscriptionMemory:
             threshold = max(3, word_count // 200)
             for word, count in freq_tags.items():
                 if count >= threshold:
-                    extracted.append({"name": word, "category": "topic", "count": count})
+                    extracted.append(
+                        {"name": word, "category": "topic", "count": count}
+                    )
 
         # Deduplicate (case-insensitive)
         seen = set()

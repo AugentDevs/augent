@@ -865,7 +865,13 @@ def handle_tools_list(id: Any) -> None:
                                 "model_size": {
                                     "type": "string",
                                     "description": "Whisper model size. ALWAYS use tiny unless the user explicitly requests a different size.",
-                                    "enum": ["tiny", "base", "small", "medium", "large"],
+                                    "enum": [
+                                        "tiny",
+                                        "base",
+                                        "small",
+                                        "medium",
+                                        "large",
+                                    ],
                                 },
                                 "clip": {
                                     "type": "boolean",
@@ -2264,14 +2270,16 @@ def handle_highlights(arguments: dict) -> dict:
             dedup_seconds=30,
         )
         for r in search_result.get("results", []):
-            highlights.append({
-                "start": r["start"],
-                "end": r["end"],
-                "timestamp": r["timestamp"],
-                "text": r["text"],
-                "score": round(r["similarity"], 3),
-                "mode": "focused",
-            })
+            highlights.append(
+                {
+                    "start": r["start"],
+                    "end": r["end"],
+                    "timestamp": r["timestamp"],
+                    "text": r["text"],
+                    "score": round(r["similarity"], 3),
+                    "mode": "focused",
+                }
+            )
     else:
         # Auto mode: use chapters to find topic boundaries, then rank by density
         # Get chapters with moderate sensitivity for meaningful segments
@@ -2309,16 +2317,18 @@ def handle_highlights(arguments: dict) -> dict:
         for score, ch in scored[:top_k]:
             # Get full text for the chapter via deep_search on a representative query
             text = ch.get("text", "")
-            highlights.append({
-                "start": ch["start"],
-                "end": ch["end"],
-                "timestamp": ch["start_timestamp"],
-                "text": text,
-                "score": round(score, 4),
-                "mode": "auto",
-                "chapter_number": ch["chapter_number"],
-                "duration": round(ch["end"] - ch["start"], 1),
-            })
+            highlights.append(
+                {
+                    "start": ch["start"],
+                    "end": ch["end"],
+                    "timestamp": ch["start_timestamp"],
+                    "text": text,
+                    "score": round(score, 4),
+                    "mode": "auto",
+                    "chapter_number": ch["chapter_number"],
+                    "duration": round(ch["end"] - ch["start"], 1),
+                }
+            )
 
         # Sort highlights chronologically
         highlights.sort(key=lambda x: x["start"])

@@ -1122,7 +1122,13 @@ class TestHighlights:
     def test_focused_mode_respects_top_k(self, mock_ds):
         mock_ds.return_value = {
             "results": [
-                {"start": i * 10.0, "end": i * 10.0 + 5, "timestamp": f"{i}:00", "text": f"r{i}", "similarity": 0.5}
+                {
+                    "start": i * 10.0,
+                    "end": i * 10.0 + 5,
+                    "timestamp": f"{i}:00",
+                    "text": f"r{i}",
+                    "similarity": 0.5,
+                }
                 for i in range(10)
             ],
             "total_segments": 100,

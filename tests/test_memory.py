@@ -377,7 +377,9 @@ class TestTagging:
         ai_tags = [t for t in tags if t["name"] == "AI"]
         assert len(ai_tags) == 1
 
-    def test_auto_tag_extracts_capitalized_phrases(self, temp_memory, stored_transcription):
+    def test_auto_tag_extracts_capitalized_phrases(
+        self, temp_memory, stored_transcription
+    ):
         text = (
             "Today we talked to Greg Eisenberg about startups. "
             "Greg Eisenberg shared his thoughts on building products. "
@@ -392,8 +394,12 @@ class TestTagging:
         extracted = temp_memory.auto_tag(stored_transcription, "hi")
         assert extracted == []
 
-    def test_auto_tag_frequency_mode_for_lowercase(self, temp_memory, stored_transcription):
-        text = " ".join(["obsidian"] * 20 + ["the"] * 50 + ["random"] * 2 + ["filler"] * 100)
+    def test_auto_tag_frequency_mode_for_lowercase(
+        self, temp_memory, stored_transcription
+    ):
+        text = " ".join(
+            ["obsidian"] * 20 + ["the"] * 50 + ["random"] * 2 + ["filler"] * 100
+        )
         extracted = temp_memory.auto_tag(stored_transcription, text)
         names = [t["name"] for t in extracted]
         assert "obsidian" in names
