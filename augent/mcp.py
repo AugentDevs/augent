@@ -846,7 +846,7 @@ def handle_tools_list(id: Any) -> None:
                     },
                     {
                         "name": "highlights",
-                        "description": "Extract the best moments from a transcription as MP4 video clips. Two modes: auto (AI picks top moments by quotability and insight density) or focused (find moments matching a specific topic, person, or concept). Returns timestamps and text for each highlight — the calling agent decides which to export as clips.",
+                        "description": "Export MP4 clips of specific moments. Two modes: auto (AI picks top moments by quotability and insight density) or focused (find moments matching a specific topic, person, or concept). Returns timestamps and text for each highlight, the calling agent decides which to export as clips.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {

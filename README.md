@@ -164,13 +164,13 @@ Restart Claude Code. Run `/mcp` to verify connection.
 | [`deep_search`](https://docs.augent.app/tools/deep-search) | Search audio by meaning, not just keywords (semantic search) |
 | [`take_notes`](https://docs.augent.app/tools/take-notes) | Take notes from any URL with style presets |
 | [`chapters`](https://docs.augent.app/tools/chapters) | Auto-detect topic chapters in audio with timestamps |
-| [`batch_search`](https://docs.augent.app/tools/batch-search) | Search multiple files in parallel — built for batch workflows and agent swarms |
+| [`batch_search`](https://docs.augent.app/tools/batch-search) | Search multiple files in parallel, built for batch workflows and agent swarms |
 | [`text_to_speech`](https://docs.augent.app/tools/text-to-speech) | Convert text to natural speech audio (Kokoro TTS, 54 voices, 9 languages) |
 | [`search_proximity`](https://docs.augent.app/tools/search-proximity) | Find where keywords appear near each other |
 | [`identify_speakers`](https://docs.augent.app/tools/identify-speakers) | Identify who speaks when in audio (speaker diarization) |
 | [`separate_audio`](https://docs.augent.app/tools/separate-audio) | Isolate vocals from music and background noise (Demucs v4) |
 | [`clip_export`](https://docs.augent.app/tools/clip-export) | Export a video clip from a URL for a specific time range |
-| [`highlights`](https://docs.augent.app/tools/highlights) | Extract the best moments from audio as timestamped highlights or MP4 clips |
+| [`highlights`](https://docs.augent.app/tools/highlights) | Export MP4 clips of specific moments, auto-pick the best or target exactly what you want |
 | [`search_memory`](https://docs.augent.app/tools/search-memory) | Search across ALL stored transcriptions by keyword or meaning |
 | [`list_files`](https://docs.augent.app/tools/list-files) | List media files in a directory |
 | [`list_memories`](https://docs.augent.app/tools/list-memories) | List stored transcriptions by title |
