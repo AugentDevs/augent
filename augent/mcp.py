@@ -1296,6 +1296,17 @@ def handle_transcribe_audio(arguments: dict) -> dict:
             bold_columns=["timestamp"],
         )
 
+    # Auto-tag the transcription
+    try:
+        from .memory import get_transcription_memory
+
+        _mem = get_transcription_memory()
+        _audio_hash = _mem.hash_audio_file(audio_path)
+        _ck = f"{_audio_hash}:{model_size}"
+        _mem.auto_tag(_ck, response.get("text", ""))
+    except Exception:
+        pass
+
     return response
 
 
@@ -1801,6 +1812,17 @@ def handle_take_notes(arguments: dict) -> dict:
         response[
             "instruction"
         ] += f"\n\nAfter saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
+
+    # Auto-tag the transcription
+    try:
+        from .memory import get_transcription_memory
+
+        _mem = get_transcription_memory()
+        _audio_hash = _mem.hash_audio_file(audio_path)
+        _ck = f"{_audio_hash}:{model_size}"
+        _mem.auto_tag(_ck, text)
+    except Exception:
+        pass
 
     return response
 

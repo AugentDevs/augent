@@ -140,6 +140,40 @@ class TranscriptionMemory:
                 ON diarization(audio_hash)
             """)
 
+            # Tags table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS tags (
+                    tag_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    category TEXT DEFAULT '',
+                    created_at REAL
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)
+            """)
+
+            # Junction table: transcriptions <-> tags (many-to-many)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS transcription_tags (
+                    cache_key TEXT NOT NULL,
+                    tag_id INTEGER NOT NULL,
+                    source TEXT DEFAULT 'auto',
+                    created_at REAL,
+                    PRIMARY KEY (cache_key, tag_id),
+                    FOREIGN KEY (cache_key) REFERENCES transcriptions(cache_key),
+                    FOREIGN KEY (tag_id) REFERENCES tags(tag_id)
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tt_cache_key
+                ON transcription_tags(cache_key)
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tt_tag_id
+                ON transcription_tags(tag_id)
+            """)
+
             conn.commit()
 
     @staticmethod
@@ -548,6 +582,8 @@ class TranscriptionMemory:
                 conn.execute("DELETE FROM embeddings")
                 conn.execute("DELETE FROM diarization")
                 conn.execute("DELETE FROM source_urls")
+                conn.execute("DELETE FROM transcription_tags")
+                conn.execute("DELETE FROM tags")
                 conn.commit()
 
             # Delete markdown files outside the DB transaction
@@ -599,10 +635,17 @@ class TranscriptionMemory:
             cursor = conn.execute("SELECT COUNT(*) FROM diarization")
             diarization_count = cursor.fetchone()[0]
 
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM tags")
+                tag_count = cursor.fetchone()[0]
+            except Exception:
+                tag_count = 0
+
             return {
                 "entries": count,
                 "embedding_entries": embedding_count,
                 "diarization_entries": diarization_count,
+                "tag_count": tag_count,
                 "total_audio_duration_hours": round(total_duration / 3600, 2),
                 "memory_size_mb": round((db_size + md_size) / (1024 * 1024), 2),
                 "memory_path": str(self.db_path),
@@ -755,6 +798,10 @@ class TranscriptionMemory:
                     )
                     conn.execute(
                         "DELETE FROM embeddings WHERE cache_key = ?",
+                        (cache_key,),
+                    )
+                    conn.execute(
+                        "DELETE FROM transcription_tags WHERE cache_key = ?",
                         (cache_key,),
                     )
                     conn.commit()
@@ -995,6 +1042,223 @@ class TranscriptionMemory:
                     conn.commit()
         except Exception:
             pass
+
+    # ── Tag methods ──────────────────────────────────────────────────
+
+    def add_tags(
+        self,
+        cache_key: str,
+        tags: List[str],
+        category: str = "manual",
+        source: str = "manual",
+    ) -> List[dict]:
+        """Add tags to a transcription. Creates tags if they don't exist."""
+        import time
+
+        now = time.time()
+        added = []
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                for tag_name in tags:
+                    tag_name = tag_name.strip()
+                    if not tag_name:
+                        continue
+                    # Upsert tag
+                    conn.execute(
+                        "INSERT OR IGNORE INTO tags (name, category, created_at) VALUES (?, ?, ?)",
+                        (tag_name, category, now),
+                    )
+                    # Get tag_id
+                    cursor = conn.execute(
+                        "SELECT tag_id FROM tags WHERE name = ?", (tag_name,)
+                    )
+                    tag_id = cursor.fetchone()[0]
+                    # Link to transcription
+                    conn.execute(
+                        "INSERT OR IGNORE INTO transcription_tags (cache_key, tag_id, source, created_at) VALUES (?, ?, ?, ?)",
+                        (cache_key, tag_id, source, now),
+                    )
+                    added.append({"name": tag_name, "category": category, "source": source})
+                conn.commit()
+        return added
+
+    def remove_tags(self, cache_key: str, tags: List[str]) -> int:
+        """Remove tags from a transcription. Returns number removed."""
+        removed = 0
+        with self._lock:
+            with sqlite3.connect(self.db_path) as conn:
+                for tag_name in tags:
+                    tag_name = tag_name.strip()
+                    if not tag_name:
+                        continue
+                    cursor = conn.execute(
+                        "SELECT tag_id FROM tags WHERE name = ?", (tag_name,)
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        conn.execute(
+                            "DELETE FROM transcription_tags WHERE cache_key = ? AND tag_id = ?",
+                            (cache_key, row[0]),
+                        )
+                        removed += conn.total_changes
+                conn.commit()
+        return removed
+
+    def get_tags(self, cache_key: str) -> List[dict]:
+        """Get all tags for a transcription."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT t.name, t.category, tt.source
+                FROM transcription_tags tt
+                JOIN tags t ON tt.tag_id = t.tag_id
+                WHERE tt.cache_key = ?
+                ORDER BY t.name
+                """,
+                (cache_key,),
+            )
+            return [
+                {"name": row[0], "category": row[1], "source": row[2]}
+                for row in cursor.fetchall()
+            ]
+
+    def filter_by_tag(self, tag_name: str) -> List[dict]:
+        """Find all transcriptions with a given tag."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT tr.cache_key, tr.title, tr.duration, tr.model_size,
+                       tr.file_path, tr.language, tr.created_at
+                FROM transcription_tags tt
+                JOIN tags t ON tt.tag_id = t.tag_id
+                JOIN transcriptions tr ON tt.cache_key = tr.cache_key
+                WHERE t.name = ? COLLATE NOCASE
+                ORDER BY tr.created_at DESC
+                """,
+                (tag_name,),
+            )
+            results = []
+            for row in cursor.fetchall():
+                duration = row[2] or 0
+                m, s = divmod(int(duration), 60)
+                h, m = divmod(m, 60)
+                fmt = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+                results.append({
+                    "cache_key": row[0],
+                    "title": row[1] or "(untitled)",
+                    "duration": duration,
+                    "duration_formatted": fmt,
+                    "model_size": row[3],
+                    "file_path": row[4],
+                    "language": row[5],
+                })
+            return results
+
+    _STOPWORDS = frozenset(
+        "the a an and or but in on at to for of is it this that was were be been "
+        "being have has had do does did will would shall should may might can could "
+        "with from by as are am not no nor so if then than too very just about above "
+        "after again all also any because before between both each few more most other "
+        "some such only own same these those through under until while into over during "
+        "out up down off here there when where which who whom what how its his her he "
+        "she they them their we our you your my me us him i one two three four five "
+        "six seven eight nine ten much many well back even still way take come go get "
+        "got make like know think say see look find give tell use call work try ask "
+        "need feel become leave put mean keep let begin seem help show hear play run "
+        "move live believe hold bring happen write provide sit stand lose pay meet "
+        "include continue set learn change lead understand watch follow stop create "
+        "speak read allow add spend grow open walk win offer remember love consider "
+        "appear buy wait serve die send expect build stay fall cut reach kill remain "
+        "right really actually going something people thing things yeah okay sure "
+        "oh um uh like kind sort just gonna want know mean literally basically "
+        "pretty much stuff lot already said".split()
+    )
+
+    def auto_tag(self, cache_key: str, text: str) -> List[dict]:
+        """Extract entities from transcription text and auto-tag."""
+        import re
+
+        if not text or len(text) < 50:
+            return []
+
+        words = text.split()
+        word_count = len(words)
+        if word_count < 20:
+            return []
+
+        # Strategy 1: Capitalized multi-word phrases (likely proper nouns)
+        cap_phrases = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b', text)
+        phrase_freq = {}
+        for p in cap_phrases:
+            p_lower = p.lower()
+            if p_lower not in self._STOPWORDS:
+                phrase_freq[p] = phrase_freq.get(p, 0) + 1
+
+        # Strategy 2: Repeated capitalized single words (not at sentence start)
+        # Look for capitalized words NOT after . ! ? or start of text
+        single_caps = re.findall(r'(?<![.!?\n])\s([A-Z][a-z]{2,})\b', text)
+        single_freq = {}
+        for w in single_caps:
+            w_lower = w.lower()
+            if w_lower not in self._STOPWORDS and len(w) > 2:
+                single_freq[w] = single_freq.get(w, 0) + 1
+
+        # Strategy 3: Frequency-based keywords (for all-lowercase whisper output)
+        all_lowercase = text == text.lower()
+        freq_tags = {}
+        if all_lowercase:
+            for w in words:
+                w_clean = re.sub(r'[^a-z]', '', w.lower())
+                if len(w_clean) > 3 and w_clean not in self._STOPWORDS:
+                    freq_tags[w_clean] = freq_tags.get(w_clean, 0) + 1
+
+        # Collect tags with thresholds
+        extracted = []
+        company_suffixes = {"inc", "corp", "llc", "ltd", "co", "group", "foundation", "labs", "ai"}
+
+        # Multi-word phrases (threshold: 2+)
+        for phrase, count in phrase_freq.items():
+            if count >= 2:
+                last_word = phrase.split()[-1].lower()
+                cat = "company" if last_word in company_suffixes else "person"
+                extracted.append({"name": phrase, "category": cat, "count": count})
+
+        # Single capitalized words (threshold: 3+)
+        for word, count in single_freq.items():
+            if count >= 3:
+                extracted.append({"name": word, "category": "topic", "count": count})
+
+        # Frequency keywords for all-lowercase text (threshold: relative to length)
+        if all_lowercase:
+            threshold = max(3, word_count // 200)
+            for word, count in freq_tags.items():
+                if count >= threshold:
+                    extracted.append({"name": word, "category": "topic", "count": count})
+
+        # Deduplicate (case-insensitive)
+        seen = set()
+        unique = []
+        for tag in sorted(extracted, key=lambda x: x["count"], reverse=True):
+            key = tag["name"].lower()
+            if key not in seen:
+                seen.add(key)
+                unique.append(tag)
+
+        # Limit to top 15
+        unique = unique[:15]
+
+        if unique:
+            tag_names = [t["name"] for t in unique]
+            categories = {t["name"]: t["category"] for t in unique}
+            for tag in unique:
+                self.add_tags(
+                    cache_key,
+                    [tag["name"]],
+                    category=categories[tag["name"]],
+                    source="auto",
+                )
+
+        return unique
 
 
 class ModelCache:
