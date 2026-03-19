@@ -269,7 +269,7 @@ Open: **http://127.0.0.1:8282**
 
 ## Multilingual
 
-Augent transcribes audio in its **original language** — Chinese, French, Spanish, Japanese, etc. — with full accuracy. Translation to English is handled by Claude (or your LLM), producing far better translations than any local model.
+Augent transcribes audio in its **original language** with full accuracy — powered by OpenAI's Whisper, supporting **99 languages** including Chinese, French, Spanish, Japanese, Arabic, Hindi, Korean, German, Russian, Portuguese, and many more. Language is auto-detected, no configuration needed. Translation to English is handled by Claude (or your LLM), producing far better translations than any local model.
 
 - When a transcription returns a non-English language, the MCP response includes a **translation offer**
 - Accepting stores a clean English `(eng)` sibling file in memory alongside the original
