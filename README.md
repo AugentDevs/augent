@@ -93,55 +93,33 @@ No background services. No telemetry. No sudo on macOS.
 ## How It Works
 
 ```mermaid
-graph TB
-    A["URL / File"] --> B["Download"]
-    B --> S["Separate Vocals"]
-    S --> C["Transcribe"]
-    C --> D["Memory"]
-    D --> T["Tag"]
+graph LR
+    subgraph INPUT [" "]
+        A["URL / File"] --> B["Download"] --> S["Separate"] --> C["Transcribe"]
+    end
 
-    D --> E["Search"]
-    D --> F["Analyze"]
-    D --> G["Export"]
+    subgraph INTELLIGENCE [" "]
+        direction LR
+        E["Search\nKeyword · Semantic\nProximity · Batch\nCross-Memory"]
+        F["Analyze\nChapters · Speaker ID\nNotes · Highlights"]
+        G["Export\nClip Export · TTS\nTag · Memory"]
+    end
 
-    E --> E1["Keyword"]
-    E --> E2["Semantic"]
-    E --> E3["Proximity"]
-    E --> E4["Batch"]
-    E --> E5["Cross-Memory"]
+    C --> E
+    C --> F
+    C --> G
 
-    F --> F1["Chapters"]
-    F --> F2["Speaker ID"]
-    F --> F3["Notes"]
-    F --> F4["Highlights"]
+    style A fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style B fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style S fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style C fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style E fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
+    style F fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
+    style G fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
+    style INPUT fill:none,stroke:none
+    style INTELLIGENCE fill:none,stroke:none
 
-    G --> G1["Clip Export"]
-    G --> G2["Text to Speech"]
-
-    style A fill:#0a0a0a,stroke:#00f060,color:#00f060
-    style B fill:#0a0a0a,stroke:#00f060,color:#00f060
-    style S fill:#0a0a0a,stroke:#00f060,color:#00f060
-    style C fill:#0a0a0a,stroke:#00f060,color:#00f060
-    style D fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
-    style T fill:#0d2618,stroke:#00f060,color:#00f060
-
-    style E fill:#0a0a0a,stroke:#00c050,color:#00c050
-    style F fill:#0a0a0a,stroke:#00c050,color:#00c050
-    style G fill:#0a0a0a,stroke:#00c050,color:#00c050
-
-    style E1 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style E2 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style E3 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style E4 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style E5 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style F1 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style F2 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style F3 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style F4 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style G1 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-    style G2 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
-
-    linkStyle default stroke:#00f060,stroke-width:1px
+    linkStyle default stroke:#00f060,stroke-width:1.5px
 ```
 
 ## Project Structure
