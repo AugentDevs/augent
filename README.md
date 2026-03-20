@@ -103,26 +103,15 @@ graph TB
     D --> Export
 
     subgraph Search
-        direction LR
-        E1["Keyword"]
-        E2["Semantic"]
-        E3["Proximity"]
-        E4["Batch"]
-        E5["Cross-Memory"]
+        E1["Keyword"] ~~~ E2["Semantic"] ~~~ E3["Proximity"] ~~~ E4["Batch"] ~~~ E5["Cross-Memory"]
     end
 
     subgraph Analyze
-        direction LR
-        F1["Chapters"]
-        F2["Speaker ID"]
-        F3["Notes"]
-        F4["Highlights"]
+        F1["Chapters"] ~~~ F2["Speaker ID"] ~~~ F3["Notes"] ~~~ F4["Highlights"]
     end
 
     subgraph Export
-        direction LR
-        G1["Clip Export"]
-        G2["TTS"]
+        G1["Clip Export"] ~~~ G2["TTS"]
     end
 
     style A fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
