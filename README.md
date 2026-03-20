@@ -94,18 +94,16 @@ No background services. No telemetry. No sudo on macOS.
 
 ```mermaid
 graph TB
-    A["URL / File"] --> B["Download"]
-    B --> S["Separate Vocals"]
-    S --> C["Transcribe"]
+    A["URL / File"] --> B["Download + Separate"]
+    B --> C["Transcribe"]
     C --> D["Memory + Tag"]
 
-    D --> E["Search\nKeyword · Semantic · Proximity\nBatch · Cross-Memory"]
+    D --> E["Search\nKeyword · Semantic\nProximity · Batch · Cross-Memory"]
     D --> F["Analyze\nChapters · Speaker ID\nNotes · Highlights"]
-    D --> G["Export\nClip Export · Text to Speech"]
+    D --> G["Export\nClip Export · TTS"]
 
     style A fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
     style B fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
-    style S fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
     style C fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
     style D fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
     style E fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
