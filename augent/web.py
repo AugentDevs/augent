@@ -692,6 +692,61 @@ select option { background:var(--black); color:var(--green); }
     margin-left: auto;
 }
 
+.memory-tag-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--green-border);
+    max-height: 90px;
+    overflow-y: auto;
+}
+.memory-tag-bar:empty { display: none; }
+.memory-tag-btn {
+    background: rgba(0,240,96,0.05);
+    border: 1px solid var(--green-border);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--green-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: var(--sans);
+}
+.memory-tag-btn:hover {
+    border-color: var(--green-border-hover);
+    color: var(--green);
+    background: rgba(0,240,96,0.1);
+}
+.memory-tag-btn.active {
+    background: rgba(0,240,96,0.15);
+    border-color: var(--green);
+    color: var(--green);
+    font-weight: 600;
+}
+.memory-tag-btn .tag-count {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-left: 4px;
+}
+.memory-card .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.memory-card .card-tag {
+    background: rgba(0,240,96,0.06);
+    border: 1px solid var(--green-border);
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--green-dim);
+    font-weight: 500;
+}
+
 .memory-body {
     display: flex;
     flex: 1;
@@ -1217,6 +1272,7 @@ select option { background:var(--black); color:var(--green); }
         <input type="text" id="memoryQuery" placeholder="Search across all memories...">
         <div class="stats" id="memoryStats"></div>
     </div>
+    <div class="memory-tag-bar" id="memoryTagBar"></div>
     <div class="memory-body">
         <div class="memory-list-panel" id="memoryListPanel">
             <div class="memory-empty" id="memoryEmpty">Loading...</div>
@@ -1985,43 +2041,108 @@ document.getElementById('memoryQuery').addEventListener('input', (e) => {
     }, 300);
 });
 
+let _activeTagFilter = null;
+let _allMemoryItems = [];
+
 async function loadMemoryList() {
     const panel = document.getElementById('memoryListPanel');
     const statsEl = document.getElementById('memoryStats');
+    const tagBar = document.getElementById('memoryTagBar');
     try {
-        const resp = await fetch('/api/memory/list');
-        const data = await resp.json();
-        const items = data.items || [];
-        statsEl.textContent = items.length + ' transcription' + (items.length !== 1 ? 's' : '') + ' in memory';
+        const [memResp, tagResp] = await Promise.all([
+            fetch('/api/memory/list'),
+            fetch('/api/memory/tags'),
+        ]);
+        const data = await memResp.json();
+        const tagData = await tagResp.json();
+        _allMemoryItems = data.items || [];
+        const allTags = tagData.tags || [];
 
-        if (items.length === 0) {
-            panel.innerHTML = '<div class="memory-empty">No transcriptions in memory yet.<br>Transcribe audio to build your library.</div>';
-            return;
+        // Render tag bar
+        if (allTags.length > 0) {
+            let tagHtml = '';
+            for (const t of allTags) {
+                const isActive = _activeTagFilter && _activeTagFilter.toLowerCase() === t.name.toLowerCase();
+                tagHtml += '<button class="memory-tag-btn' + (isActive ? ' active' : '') + '" onclick="toggleTagFilter(\'' + escHtml(t.name.replace(/'/g, "\\'")) + '\')">';
+                tagHtml += escHtml(t.name) + '<span class="tag-count">' + t.count + '</span></button>';
+            }
+            tagBar.innerHTML = tagHtml;
+        } else {
+            tagBar.innerHTML = '';
         }
 
-        let html = '';
-        for (const item of items) {
-            const isYt = item.source_url && item.source_url.includes('youtu');
-            const ytBadge = isYt ? '<span class="yt-icon">YT</span>' : '';
-            html += '<div class="memory-card" data-key="' + escHtml(item.cache_key) + '" data-source-url="' + escHtml(item.source_url || '') + '" data-file-path="' + escHtml(item.file_path || '') + '" data-title="' + escHtml(item.title) + '" onclick="loadMemoryDetail(\'' + escHtml(item.cache_key) + '\', this)">';
-            html += '<div class="card-actions">';
-            html += '<button class="search-action" onclick="event.stopPropagation(); searchFromMemory(this.closest(\'.memory-card\'))" title="Search this audio"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>';
-            html += '<button onclick="event.stopPropagation(); revealMemory(\'' + escHtml(item.cache_key) + '\')" title="Show Audio in Finder"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>';
-            html += '<button onclick="event.stopPropagation(); revealTranscript(\'' + escHtml(item.cache_key) + '\')" title="Show Transcript in Finder"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>';
-            html += '<button onclick="event.stopPropagation(); deleteMemory(\'' + escHtml(item.cache_key) + '\', this)" title="Delete from memory"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>';
-            html += '</div>';
-            html += '<div class="card-title">' + escHtml(item.title) + '</div>';
-            html += '<div class="card-meta">';
-            html += '<span class="duration">' + escHtml(item.duration_formatted) + '</span>';
-            html += '<span class="pill">' + escHtml(item.model_size) + '</span>';
-            html += ytBadge;
-            html += '<span>' + escHtml(item.date) + '</span>';
-            html += '</div></div>';
-        }
-        panel.innerHTML = html;
+        renderMemoryCards();
     } catch (err) {
         panel.innerHTML = '<div class="memory-empty">Error loading memories</div>';
     }
+}
+
+function toggleTagFilter(tagName) {
+    if (_activeTagFilter && _activeTagFilter.toLowerCase() === tagName.toLowerCase()) {
+        _activeTagFilter = null;
+    } else {
+        _activeTagFilter = tagName;
+    }
+    // Update active state on buttons
+    document.querySelectorAll('.memory-tag-btn').forEach(btn => {
+        const btnTag = btn.textContent.replace(/\d+$/, '').trim();
+        btn.classList.toggle('active', _activeTagFilter && btnTag.toLowerCase() === _activeTagFilter.toLowerCase());
+    });
+    renderMemoryCards();
+}
+
+function renderMemoryCards() {
+    const panel = document.getElementById('memoryListPanel');
+    const statsEl = document.getElementById('memoryStats');
+    let items = _allMemoryItems;
+
+    if (_activeTagFilter) {
+        items = items.filter(item =>
+            (item.tags || []).some(t => t.toLowerCase() === _activeTagFilter.toLowerCase())
+        );
+        statsEl.textContent = items.length + ' of ' + _allMemoryItems.length + ' — filtered by "' + _activeTagFilter + '"';
+    } else {
+        statsEl.textContent = items.length + ' transcription' + (items.length !== 1 ? 's' : '') + ' in memory';
+    }
+
+    if (items.length === 0) {
+        panel.innerHTML = _activeTagFilter
+            ? '<div class="memory-empty">No transcriptions with tag "' + escHtml(_activeTagFilter) + '"</div>'
+            : '<div class="memory-empty">No transcriptions in memory yet.<br>Transcribe audio to build your library.</div>';
+        return;
+    }
+
+    let html = '';
+    for (const item of items) {
+        const isYt = item.source_url && item.source_url.includes('youtu');
+        const ytBadge = isYt ? '<span class="yt-icon">YT</span>' : '';
+        html += '<div class="memory-card" data-key="' + escHtml(item.cache_key) + '" data-source-url="' + escHtml(item.source_url || '') + '" data-file-path="' + escHtml(item.file_path || '') + '" data-title="' + escHtml(item.title) + '" onclick="loadMemoryDetail(\'' + escHtml(item.cache_key) + '\', this)">';
+        html += '<div class="card-actions">';
+        html += '<button class="search-action" onclick="event.stopPropagation(); searchFromMemory(this.closest(\'.memory-card\'))" title="Search this audio"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>';
+        html += '<button onclick="event.stopPropagation(); revealMemory(\'' + escHtml(item.cache_key) + '\')" title="Show Audio in Finder"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>';
+        html += '<button onclick="event.stopPropagation(); revealTranscript(\'' + escHtml(item.cache_key) + '\')" title="Show Transcript in Finder"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></button>';
+        html += '<button onclick="event.stopPropagation(); deleteMemory(\'' + escHtml(item.cache_key) + '\', this)" title="Delete from memory"><svg viewBox="0 0 24 24" fill="none" stroke="#00F060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>';
+        html += '</div>';
+        html += '<div class="card-title">' + escHtml(item.title) + '</div>';
+        html += '<div class="card-meta">';
+        html += '<span class="duration">' + escHtml(item.duration_formatted) + '</span>';
+        html += '<span class="pill">' + escHtml(item.model_size) + '</span>';
+        html += ytBadge;
+        html += '<span>' + escHtml(item.date) + '</span>';
+        html += '</div>';
+        // Tag pills on each card
+        const tags = item.tags || [];
+        if (tags.length > 0) {
+            html += '<div class="card-tags">';
+            for (const tag of tags.slice(0, 5)) {
+                html += '<span class="card-tag">' + escHtml(tag) + '</span>';
+            }
+            if (tags.length > 5) html += '<span class="card-tag">+' + (tags.length - 5) + '</span>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    panel.innerHTML = html;
 }
 
 async function loadMemoryDetail(cacheKey, cardEl) {
@@ -2514,6 +2635,17 @@ async def search_audio(
                         },
                     )
                     yield send("log", text="  [memory] saved to memory")
+                    # Semantic tagging
+                    try:
+                        full_text = " ".join(s["text"].strip() for s in segments)
+                        _ah = memory.hash_audio_file(tmp_path)
+                        _ck = f"{_ah}:{model_size}"
+                        from .embeddings import semantic_tag
+                        assigned = await asyncio.to_thread(semantic_tag, _ck, full_text)
+                        if assigned:
+                            yield send("log", text=f"  [tags] {', '.join(assigned)}")
+                    except Exception:
+                        pass
                 except Exception as mem_err:
                     yield send("log", text=f"  [memory] save failed: {mem_err}")
 
@@ -2833,6 +2965,17 @@ async def download_and_search(request: Request):
                         },
                     )
                     yield send("log", text="  [memory] saved to memory")
+                    # Semantic tagging
+                    try:
+                        full_text = " ".join(s["text"].strip() for s in segments)
+                        _ah = memory.hash_audio_file(audio_path)
+                        _ck = f"{_ah}:{model_size}"
+                        from .embeddings import semantic_tag
+                        assigned = await asyncio.to_thread(semantic_tag, _ck, full_text)
+                        if assigned:
+                            yield send("log", text=f"  [tags] {', '.join(assigned)}")
+                    except Exception:
+                        pass
                 except Exception as mem_err:
                     yield send("log", text=f"  [memory] save failed: {mem_err}")
 
@@ -3027,6 +3170,17 @@ async def download_and_search(request: Request):
                         source_url=url,
                     )
                     yield send("log", text="  [memory] saved to memory")
+                    # Semantic tagging
+                    try:
+                        full_text = " ".join(s["text"].strip() for s in segments)
+                        _ah = memory.hash_audio_file(audio_path)
+                        _ck = f"{_ah}:{model_size}"
+                        from .embeddings import semantic_tag
+                        assigned = await asyncio.to_thread(semantic_tag, _ck, full_text)
+                        if assigned:
+                            yield send("log", text=f"  [tags] {', '.join(assigned)}")
+                    except Exception:
+                        pass
                 except Exception as mem_err:
                     yield send("log", text=f"  [memory] save failed: {mem_err}")
                 # Persist YouTube URL by hash (survives restarts)
@@ -3425,6 +3579,14 @@ async def api_memory_list():
     memory = get_transcription_memory()
     items = memory.list_all()
     return JSONResponse({"items": items})
+
+
+@app.get("/api/memory/tags")
+async def api_memory_tags():
+    """Get all tags with counts."""
+    memory = get_transcription_memory()
+    tags = memory.get_all_tags_with_counts()
+    return JSONResponse({"tags": tags})
 
 
 @app.get("/api/memory/detail/{cache_key:path}")

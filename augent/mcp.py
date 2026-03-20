@@ -845,6 +845,30 @@ def handle_tools_list(id: Any) -> None:
                         },
                     },
                     {
+                        "name": "tag",
+                        "description": "Add, remove, or list tags on a transcription. Tags are broad topic categories (e.g. 'AI', 'Health', 'Music') that help organize and filter memories in the Web UI.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "cache_key": {
+                                    "type": "string",
+                                    "description": "The cache_key of the transcription to tag",
+                                },
+                                "action": {
+                                    "type": "string",
+                                    "description": "Action to perform: add, remove, or list",
+                                    "enum": ["add", "remove", "list"],
+                                },
+                                "tags": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Tag names to add or remove. Use 2-4 broad topic categories, not names of people or specific tools. E.g. ['AI', 'Startups'] not ['Greg Eisenberg', 'Claude Code']",
+                                },
+                            },
+                            "required": ["cache_key", "action"],
+                        },
+                    },
+                    {
                         "name": "highlights",
                         "description": "Export MP4 clips of specific moments. Two modes: auto (AI picks top moments by quotability and insight density) or focused (find moments matching a specific topic, person, or concept). Returns timestamps and text for each highlight, the calling agent decides which to export as clips.",
                         "inputSchema": {
@@ -937,6 +961,8 @@ def handle_tools_call(id: Any, params: dict) -> None:
             result = handle_clip_export(arguments)
         elif tool_name == "highlights":
             result = handle_highlights(arguments)
+        elif tool_name == "tag":
+            result = handle_tag(arguments)
         else:
             send_error(id, -32602, f"Unknown tool: {tool_name}")
             return
@@ -1302,14 +1328,36 @@ def handle_transcribe_audio(arguments: dict) -> dict:
             bold_columns=["timestamp"],
         )
 
-    # Auto-tag the transcription
+    # Semantic tagging — assign existing tags based on content similarity
     try:
         from .memory import get_transcription_memory
+        from .embeddings import semantic_tag
 
         _mem = get_transcription_memory()
         _audio_hash = _mem.hash_audio_file(audio_path)
         _ck = f"{_audio_hash}:{model_size}"
-        _mem.auto_tag(_ck, response.get("text", ""))
+        response["cache_key"] = _ck
+
+        # Run semantic tagging first (matches against existing tags)
+        transcript_text = response.get("text", "")
+        semantic_tag(_ck, transcript_text)
+
+        # Then hint Claude to add new categories if needed
+        existing_tags = _mem.get_tags(_ck)
+        all_tags = _mem.get_all_tags_with_counts()
+        existing_names = [t["name"] for t in all_tags]
+        assigned_names = [t["name"] for t in existing_tags]
+        hint = (
+            f"Silently call the `tag` tool with "
+            f'cache_key: "{_ck}", action: "add", and 2-4 broad topic tags. '
+            f"Use short, high-level categories — not people's names, not specific tools, not subtopics. "
+        )
+        if assigned_names:
+            hint += f"Already assigned by semantic matching: {assigned_names}. Only add tags if a major topic is missing. "
+        if existing_names:
+            hint += f"Existing tags in this library: {existing_names}. Reuse these where they fit before creating new ones. "
+        hint += "Do not mention tagging to the user."
+        response["tagging_hint"] = hint
     except Exception:
         pass
 
@@ -1819,14 +1867,35 @@ def handle_take_notes(arguments: dict) -> dict:
             "instruction"
         ] += f"\n\nAfter saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
 
-    # Auto-tag the transcription
+    # Semantic tagging — assign existing tags based on content similarity
     try:
         from .memory import get_transcription_memory
+        from .embeddings import semantic_tag
 
         _mem = get_transcription_memory()
         _audio_hash = _mem.hash_audio_file(audio_path)
         _ck = f"{_audio_hash}:{model_size}"
-        _mem.auto_tag(_ck, text)
+        response["cache_key"] = _ck
+
+        # Run semantic tagging first (matches against existing tags)
+        semantic_tag(_ck, text)
+
+        # Then hint Claude to add new categories if needed
+        existing_tags = _mem.get_tags(_ck)
+        all_tags = _mem.get_all_tags_with_counts()
+        existing_names = [t["name"] for t in all_tags]
+        assigned_names = [t["name"] for t in existing_tags]
+        hint = (
+            f"Silently call the `tag` tool with "
+            f'cache_key: "{_ck}", action: "add", and 2-4 broad topic tags. '
+            f"Use short, high-level categories — not people's names, not specific tools, not subtopics. "
+        )
+        if assigned_names:
+            hint += f"Already assigned by semantic matching: {assigned_names}. Only add tags if a major topic is missing. "
+        if existing_names:
+            hint += f"Existing tags in this library: {existing_names}. Reuse these where they fit before creating new ones. "
+        hint += "Do not mention tagging to the user."
+        response["tagging_hint"] = hint
     except Exception:
         pass
 
@@ -2387,6 +2456,36 @@ def handle_highlights(arguments: dict) -> dict:
                 h["youtube_link"] = yt_link
 
     return result
+
+
+def handle_tag(arguments: dict) -> dict:
+    """Handle tag tool call — add, remove, or list tags on a transcription."""
+    from .memory import get_transcription_memory
+
+    cache_key = arguments.get("cache_key")
+    action = arguments.get("action", "list")
+    tags = arguments.get("tags", [])
+
+    if not cache_key:
+        return {"error": "cache_key is required"}
+
+    mem = get_transcription_memory()
+
+    if action == "add":
+        if not tags:
+            return {"error": "tags array is required for add action"}
+        added = mem.add_tags(cache_key, tags, category="topic", source="auto")
+        return {"action": "add", "cache_key": cache_key, "added": added}
+    elif action == "remove":
+        if not tags:
+            return {"error": "tags array is required for remove action"}
+        removed = mem.remove_tags(cache_key, tags)
+        return {"action": "remove", "cache_key": cache_key, "removed": removed}
+    elif action == "list":
+        tag_list = mem.get_tags(cache_key)
+        return {"action": "list", "cache_key": cache_key, "tags": tag_list}
+    else:
+        return {"error": f"Unknown action: {action}"}
 
 
 def handle_clip_export(arguments: dict) -> dict:

@@ -741,6 +741,13 @@ class TranscriptionMemory:
                             "language": row["language"] or "",
                         }
                     )
+
+            # Batch-load tags for all entries
+            if entries:
+                cache_keys = [e["cache_key"] for e in entries]
+                tags_map = self.get_tags_by_cache_keys(cache_keys)
+                for entry in entries:
+                    entry["tags"] = tags_map.get(entry["cache_key"], [])
         except Exception:
             pass
         return entries
@@ -1158,122 +1165,71 @@ class TranscriptionMemory:
                 )
             return results
 
-    _STOPWORDS = frozenset(
-        "the a an and or but in on at to for of is it this that was were be been "
-        "being have has had do does did will would shall should may might can could "
-        "with from by as are am not no nor so if then than too very just about above "
-        "after again all also any because before between both each few more most other "
-        "some such only own same these those through under until while into over during "
-        "out up down off here there when where which who whom what how its his her he "
-        "she they them their we our you your my me us him i one two three four five "
-        "six seven eight nine ten much many well back even still way take come go get "
-        "got make like know think say see look find give tell use call work try ask "
-        "need feel become leave put mean keep let begin seem help show hear play run "
-        "move live believe hold bring happen write provide sit stand lose pay meet "
-        "include continue set learn change lead understand watch follow stop create "
-        "speak read allow add spend grow open walk win offer remember love consider "
-        "appear buy wait serve die send expect build stay fall cut reach kill remain "
-        "right really actually going something people thing things yeah okay sure "
-        "oh um uh like kind sort just gonna want know mean literally basically "
-        "pretty much stuff lot already said".split()
-    )
+    def get_all_tags_with_counts(self) -> List[dict]:
+        """Get all tags with their transcription counts, sorted by count desc."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT t.name, t.category, COUNT(tt.cache_key) as count
+                FROM tags t
+                JOIN transcription_tags tt ON t.tag_id = tt.tag_id
+                GROUP BY t.tag_id
+                ORDER BY count DESC, t.name
+                """
+            )
+            return [
+                {"name": row[0], "category": row[1], "count": row[2]}
+                for row in cursor.fetchall()
+            ]
+
+    def get_tags_by_cache_keys(self, cache_keys: List[str]) -> Dict[str, List[str]]:
+        """Get tags for multiple cache_keys at once. Returns {cache_key: [tag_names]}."""
+        if not cache_keys:
+            return {}
+        result: Dict[str, List[str]] = {ck: [] for ck in cache_keys}
+        with sqlite3.connect(self.db_path) as conn:
+            placeholders = ",".join("?" for _ in cache_keys)
+            cursor = conn.execute(
+                f"""
+                SELECT tt.cache_key, t.name
+                FROM transcription_tags tt
+                JOIN tags t ON tt.tag_id = t.tag_id
+                WHERE tt.cache_key IN ({placeholders})
+                ORDER BY t.name
+                """,
+                cache_keys,
+            )
+            for row in cursor.fetchall():
+                result[row[0]].append(row[1])
+        return result
+
+    def get_tag_texts(self) -> Dict[str, List[str]]:
+        """Get representative text snippets for each tag. Returns {tag_name: [text_snippets]}."""
+        result: Dict[str, List[str]] = {}
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT t.name, tr.text
+                FROM transcription_tags tt
+                JOIN tags t ON tt.tag_id = t.tag_id
+                JOIN transcriptions tr ON tt.cache_key = tr.cache_key
+                WHERE tr.text IS NOT NULL AND LENGTH(tr.text) > 50
+                ORDER BY t.name
+                """
+            )
+            for row in cursor.fetchall():
+                tag_name = row[0]
+                text = row[1]
+                if tag_name not in result:
+                    result[tag_name] = []
+                # Take first 500 words as representative sample
+                words = text.split()[:500]
+                result[tag_name].append(" ".join(words))
+        return result
 
     def auto_tag(self, cache_key: str, text: str) -> List[dict]:
-        """Extract entities from transcription text and auto-tag."""
-        import re
-
-        if not text or len(text) < 50:
-            return []
-
-        words = text.split()
-        word_count = len(words)
-        if word_count < 20:
-            return []
-
-        # Strategy 1: Capitalized multi-word phrases (likely proper nouns)
-        cap_phrases = re.findall(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b", text)
-        phrase_freq = {}
-        for p in cap_phrases:
-            p_lower = p.lower()
-            if p_lower not in self._STOPWORDS:
-                phrase_freq[p] = phrase_freq.get(p, 0) + 1
-
-        # Strategy 2: Repeated capitalized single words (not at sentence start)
-        # Look for capitalized words NOT after . ! ? or start of text
-        single_caps = re.findall(r"(?<![.!?\n])\s([A-Z][a-z]{2,})\b", text)
-        single_freq = {}
-        for w in single_caps:
-            w_lower = w.lower()
-            if w_lower not in self._STOPWORDS and len(w) > 2:
-                single_freq[w] = single_freq.get(w, 0) + 1
-
-        # Strategy 3: Frequency-based keywords (for all-lowercase whisper output)
-        all_lowercase = text == text.lower()
-        freq_tags = {}
-        if all_lowercase:
-            for w in words:
-                w_clean = re.sub(r"[^a-z]", "", w.lower())
-                if len(w_clean) > 3 and w_clean not in self._STOPWORDS:
-                    freq_tags[w_clean] = freq_tags.get(w_clean, 0) + 1
-
-        # Collect tags with thresholds
-        extracted = []
-        company_suffixes = {
-            "inc",
-            "corp",
-            "llc",
-            "ltd",
-            "co",
-            "group",
-            "foundation",
-            "labs",
-            "ai",
-        }
-
-        # Multi-word phrases (threshold: 2+)
-        for phrase, count in phrase_freq.items():
-            if count >= 2:
-                last_word = phrase.split()[-1].lower()
-                cat = "company" if last_word in company_suffixes else "person"
-                extracted.append({"name": phrase, "category": cat, "count": count})
-
-        # Single capitalized words (threshold: 3+)
-        for word, count in single_freq.items():
-            if count >= 3:
-                extracted.append({"name": word, "category": "topic", "count": count})
-
-        # Frequency keywords for all-lowercase text (threshold: relative to length)
-        if all_lowercase:
-            threshold = max(3, word_count // 200)
-            for word, count in freq_tags.items():
-                if count >= threshold:
-                    extracted.append(
-                        {"name": word, "category": "topic", "count": count}
-                    )
-
-        # Deduplicate (case-insensitive)
-        seen = set()
-        unique = []
-        for tag in sorted(extracted, key=lambda x: x["count"], reverse=True):
-            key = tag["name"].lower()
-            if key not in seen:
-                seen.add(key)
-                unique.append(tag)
-
-        # Limit to top 15
-        unique = unique[:15]
-
-        if unique:
-            categories = {t["name"]: t["category"] for t in unique}
-            for tag in unique:
-                self.add_tags(
-                    cache_key,
-                    [tag["name"]],
-                    category=categories[tag["name"]],
-                    source="auto",
-                )
-
-        return unique
+        """Deprecated — tagging is now handled semantically or via MCP hints."""
+        return []
 
 
 class ModelCache:

@@ -237,6 +237,17 @@ context_words: 40 (optional, words of context in focused mode)
 ```
 Returns `{mode, highlight_count, highlights: [{start, end, timestamp, text, score, mode}], clips, youtube_link}`
 
+### tag
+Add, remove, or list tags on a transcription. Tags are broad topic categories that help organize and filter memories in the Web UI.
+```
+cache_key: "abc123:tiny"
+action: "add" (add, remove, or list)
+tags: ["AI", "Startups"] (required for add/remove)
+```
+**Tagging rules:** Use 2-4 broad, high-level topic categories per transcription. Good tags: "AI", "Health", "Startups", "Music", "Science", "Gaming", "Finance", "Productivity". Bad tags: people's names, specific tools, granular subtopics, single words that aren't categories. Always reuse existing tags from the library where they fit before inventing new ones.
+
+**Auto-tagging flow:** When `transcribe_audio` or `take_notes` returns a `tagging_hint` field, silently call `tag` with broad categories. The hint includes existing tags in the library — reuse them for consistency. Do not mention tagging to the user.
+
 ### identify_speakers
 Identify who speaks when in audio using pyannote speaker diarization. No API keys or tokens required.
 ```

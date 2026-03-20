@@ -284,6 +284,81 @@ def _write_results_csv(results: List[Dict], output_path: str, query: str) -> str
     return os.path.abspath(path)
 
 
+def semantic_tag(
+    cache_key: str,
+    text: str,
+    threshold: float = 0.35,
+) -> List[str]:
+    """
+    Assign tags to a transcription based on semantic similarity.
+
+    Splits the transcript into segments, embeds them, then uses each existing tag name
+    as a semantic query against those segments. If enough segments score highly for a tag,
+    that tag is assigned. Same approach as deep_search but with tag names as queries.
+
+    Returns list of tag names that were assigned.
+    """
+    memory = get_transcription_memory()
+
+    # Get existing tags
+    all_tags = memory.get_all_tags_with_counts()
+    if not all_tags:
+        return []
+
+    # Split text into sentence-like segments (~30 words each)
+    words = text.split()
+    if len(words) < 20:
+        return []
+
+    chunk_size = 30
+    segments = []
+    for i in range(0, len(words), chunk_size):
+        chunk = " ".join(words[i : i + chunk_size])
+        if len(chunk.split()) >= 5:
+            segments.append(chunk)
+
+    if not segments:
+        return []
+
+    # Embed all segments
+    model = _get_embedding_model_cache().get()
+    seg_embeddings = model.encode(
+        segments, convert_to_numpy=True, show_progress_bar=False
+    )
+
+    # For each existing tag, use an expanded query for better embedding quality.
+    # Short tag names like "AI" embed poorly — expanding them gives the embedding
+    # model more semantic signal to work with.
+    tag_names = [t["name"] for t in all_tags]
+    tag_queries = [
+        f"{name} — content about {name}, discussions related to {name}" for name in tag_names
+    ]
+    tag_embeddings = model.encode(
+        tag_queries, convert_to_numpy=True, show_progress_bar=False
+    )
+
+    matched_tags = []
+    for i, tag_name in enumerate(tag_names):
+        query_emb = tag_embeddings[i]
+        sims = _cosine_similarity(query_emb.reshape(1, -1), seg_embeddings)
+        # Use the average of top-5 segment scores (captures topic presence without
+        # requiring the whole transcript to be about it)
+        top_scores = sorted(sims, reverse=True)[:5]
+        avg_score = float(np.mean(top_scores))
+
+        if avg_score >= threshold:
+            matched_tags.append((tag_name, avg_score))
+
+    # Sort by score, take top 4
+    matched_tags.sort(key=lambda x: x[1], reverse=True)
+    assigned = [name for name, _ in matched_tags[:4]]
+
+    if assigned:
+        memory.add_tags(cache_key, assigned, category="topic", source="auto")
+
+    return assigned
+
+
 def deep_search(
     audio_path: str,
     query: str,
