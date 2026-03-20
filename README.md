@@ -98,19 +98,26 @@ flowchart LR
     A["URL / File"] --> B["Download"]
     B --> S["Separate"]
     S --> C["Transcribe"]
-    C --> D["Memory + Tags"]
+    C --> D["Memory"]
+    D --> T["Tag"]
 
     D --> E["Search"]
     D --> F["Analyze"]
     D --> G["Export"]
 
-    E --> E1["Keyword · Semantic · Proximity"]
-    E --> E2["Batch · Cross-Memory"]
+    E --> E1["Keyword"]
+    E --> E2["Semantic"]
+    E --> E3["Proximity"]
+    E --> E4["Batch"]
+    E --> E5["Cross-Memory"]
 
-    F --> F1["Chapters · Speaker ID"]
-    F --> F2["Notes · Highlights"]
+    F --> F1["Chapters"]
+    F --> F2["Speaker ID"]
+    F --> F3["Notes"]
+    F --> F4["Highlights"]
 
-    G --> G1["Clip Export · TTS"]
+    G --> G1["Clip Export"]
+    G --> G2["Text to Speech"]
 ```
 
 ## Project Structure
