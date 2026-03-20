@@ -93,17 +93,55 @@ No background services. No telemetry. No sudo on macOS.
 ## How It Works
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
-flowchart LR
-    A["URL / File"] --> B["Download"] --> S["Separate"] --> C["Transcribe"] --> D["Memory"]
+graph TB
+    A["URL / File"] --> B["Download"]
+    B --> S["Separate Vocals"]
+    S --> C["Transcribe"]
+    C --> D["Memory"]
     D --> T["Tag"]
+
     D --> E["Search"]
     D --> F["Analyze"]
     D --> G["Export"]
 
-    E --> E1["Keyword"] & E2["Semantic"] & E3["Proximity"] & E4["Batch"] & E5["Cross-Memory"]
-    F --> F1["Chapters"] & F2["Speaker ID"] & F3["Notes"] & F4["Highlights"]
-    G --> G1["Clip Export"] & G2["Text to Speech"]
+    E --> E1["Keyword"]
+    E --> E2["Semantic"]
+    E --> E3["Proximity"]
+    E --> E4["Batch"]
+    E --> E5["Cross-Memory"]
+
+    F --> F1["Chapters"]
+    F --> F2["Speaker ID"]
+    F --> F3["Notes"]
+    F --> F4["Highlights"]
+
+    G --> G1["Clip Export"]
+    G --> G2["Text to Speech"]
+
+    style A fill:#0a0a0a,stroke:#00f060,color:#00f060
+    style B fill:#0a0a0a,stroke:#00f060,color:#00f060
+    style S fill:#0a0a0a,stroke:#00f060,color:#00f060
+    style C fill:#0a0a0a,stroke:#00f060,color:#00f060
+    style D fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style T fill:#0d2618,stroke:#00f060,color:#00f060
+
+    style E fill:#0a0a0a,stroke:#00c050,color:#00c050
+    style F fill:#0a0a0a,stroke:#00c050,color:#00c050
+    style G fill:#0a0a0a,stroke:#00c050,color:#00c050
+
+    style E1 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style E2 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style E3 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style E4 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style E5 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style F1 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style F2 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style F3 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style F4 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style G1 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+    style G2 fill:#0a0a0a,stroke:#1a1a1a,color:#6fba6f
+
+    linkStyle default stroke:#00f060,stroke-width:1px
 ```
 
 ## Project Structure
