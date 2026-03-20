@@ -1330,8 +1330,8 @@ def handle_transcribe_audio(arguments: dict) -> dict:
 
     # Semantic tagging — assign existing tags based on content similarity
     try:
-        from .memory import get_transcription_memory
         from .embeddings import semantic_tag
+        from .memory import get_transcription_memory
 
         _mem = get_transcription_memory()
         _audio_hash = _mem.hash_audio_file(audio_path)
@@ -1869,8 +1869,8 @@ def handle_take_notes(arguments: dict) -> dict:
 
     # Semantic tagging — assign existing tags based on content similarity
     try:
-        from .memory import get_transcription_memory
         from .embeddings import semantic_tag
+        from .memory import get_transcription_memory
 
         _mem = get_transcription_memory()
         _audio_hash = _mem.hash_audio_file(audio_path)
