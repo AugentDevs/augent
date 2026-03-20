@@ -98,11 +98,12 @@ graph TB
     B --> C["Transcribe"]
     C --> D["Memory + Tag"]
 
-    D --> E1 & E2 & E3 & E4 & E5
-    D --> F1 & F2 & F3 & F4
-    D --> G1 & G2
+    D --> Search
+    D --> Analyze
+    D --> Export
 
     subgraph Search
+        direction LR
         E1["Keyword"]
         E2["Semantic"]
         E3["Proximity"]
@@ -111,6 +112,7 @@ graph TB
     end
 
     subgraph Analyze
+        direction LR
         F1["Chapters"]
         F2["Speaker ID"]
         F3["Notes"]
@@ -118,6 +120,7 @@ graph TB
     end
 
     subgraph Export
+        direction LR
         G1["Clip Export"]
         G2["TTS"]
     end
