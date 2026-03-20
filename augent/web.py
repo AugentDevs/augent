@@ -2641,6 +2641,7 @@ async def search_audio(
                         _ah = memory.hash_audio_file(tmp_path)
                         _ck = f"{_ah}:{model_size}"
                         from .embeddings import semantic_tag
+
                         assigned = await asyncio.to_thread(semantic_tag, _ck, full_text)
                         if assigned:
                             yield send("log", text=f"  [tags] {', '.join(assigned)}")
@@ -2971,6 +2972,7 @@ async def download_and_search(request: Request):
                         _ah = memory.hash_audio_file(audio_path)
                         _ck = f"{_ah}:{model_size}"
                         from .embeddings import semantic_tag
+
                         assigned = await asyncio.to_thread(semantic_tag, _ck, full_text)
                         if assigned:
                             yield send("log", text=f"  [tags] {', '.join(assigned)}")
@@ -3176,6 +3178,7 @@ async def download_and_search(request: Request):
                         _ah = memory.hash_audio_file(audio_path)
                         _ck = f"{_ah}:{model_size}"
                         from .embeddings import semantic_tag
+
                         assigned = await asyncio.to_thread(semantic_tag, _ck, full_text)
                         if assigned:
                             yield send("log", text=f"  [tags] {', '.join(assigned)}")

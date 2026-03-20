@@ -1168,15 +1168,13 @@ class TranscriptionMemory:
     def get_all_tags_with_counts(self) -> List[dict]:
         """Get all tags with their transcription counts, sorted by count desc."""
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT t.name, t.category, COUNT(tt.cache_key) as count
                 FROM tags t
                 JOIN transcription_tags tt ON t.tag_id = tt.tag_id
                 GROUP BY t.tag_id
                 ORDER BY count DESC, t.name
-                """
-            )
+                """)
             return [
                 {"name": row[0], "category": row[1], "count": row[2]}
                 for row in cursor.fetchall()
@@ -1207,16 +1205,14 @@ class TranscriptionMemory:
         """Get representative text snippets for each tag. Returns {tag_name: [text_snippets]}."""
         result: Dict[str, List[str]] = {}
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT t.name, tr.text
                 FROM transcription_tags tt
                 JOIN tags t ON tt.tag_id = t.tag_id
                 JOIN transcriptions tr ON tt.cache_key = tr.cache_key
                 WHERE tr.text IS NOT NULL AND LENGTH(tr.text) > 50
                 ORDER BY t.name
-                """
-            )
+                """)
             for row in cursor.fetchall():
                 tag_name = row[0]
                 text = row[1]

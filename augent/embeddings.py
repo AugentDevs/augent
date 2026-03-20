@@ -346,7 +346,8 @@ def semantic_tag(
     # model more semantic signal to work with.
     tag_names = [t["name"] for t in all_tags]
     tag_queries = [
-        f"{name} — content about {name}, discussions related to {name}" for name in tag_names
+        f"{name} — content about {name}, discussions related to {name}"
+        for name in tag_names
     ]
     tag_embeddings = model.encode(
         tag_queries, convert_to_numpy=True, show_progress_bar=False
