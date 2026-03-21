@@ -118,6 +118,7 @@ graph TB
 ```
 augent/
 ├── mcp.py          # MCP server — tools for agents
+├── config.py       # User configuration (~/.augent/config.yaml)
 ├── core.py         # Transcription engine (faster-whisper)
 ├── search.py       # Keyword search
 ├── embeddings.py   # Semantic search + chapters
@@ -285,6 +286,28 @@ Augent transcribes audio in its **original language** with full accuracy — pow
 | small | Medium | Superior |
 | medium | Slow | Outstanding |
 | large | Slowest | Maximum |
+
+<br />
+
+## Configuration
+
+Customize defaults and disable tools you don't need via `~/.augent/config.yaml`:
+
+```yaml
+# ~/.augent/config.yaml
+model_size: tiny           # Default Whisper model
+output_dir: ~/Downloads    # Default download directory
+notes_output_dir: ~/Desktop # Notes, clips, TTS output
+clip_padding: 15           # Seconds of padding around clips
+context_words: 25          # Words of context in search results
+tts_voice: af_heart        # Default TTS voice
+tts_speed: 1.0             # TTS speed multiplier
+disabled_tools: []         # Hide tools from MCP clients
+```
+
+Per-call arguments always override config. No config file needed — all values have sensible defaults.
+
+**[Configuration docs →](https://docs.augent.app/guides/configuration)**
 
 <br />
 

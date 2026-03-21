@@ -401,6 +401,25 @@ If port 8282 is already in use, run `augent-web --port <port>` with an available
 
 For parallel processing: open multiple browser tabs to the same URL. Each tab processes independently, enabling manual batch workflows.
 
+## Configuration
+
+Users can customize defaults via `~/.augent/config.yaml` (or `~/.augent/config.json` if PyYAML isn't installed). Per-call arguments always override config values. No config file is required — all values have sensible defaults.
+
+**Config keys and defaults:**
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `model_size` | `tiny` | Whisper model size |
+| `output_dir` | `~/Downloads` | Default download directory |
+| `notes_output_dir` | `~/Desktop` | Notes, clips, TTS output directory |
+| `clip_padding` | `15` | Seconds of padding around clips |
+| `context_words` | `25` | Words of context in search results |
+| `tts_voice` | `af_heart` | Default TTS voice |
+| `tts_speed` | `1.0` | TTS speed multiplier |
+| `disabled_tools` | `[]` | List of tool names to hide from MCP clients |
+
+**`disabled_tools`:** When a tool name is listed here, it is removed from the `tools/list` response and cannot be called. If a tool you expect to see is missing, the user may have disabled it in their config.
+
 ## Requirements
 
 - Python 3.10+

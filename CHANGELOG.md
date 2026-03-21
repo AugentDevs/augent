@@ -4,6 +4,13 @@ All notable changes to Augent are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.3.21] - 2026-03-21
+
+### Added
+
+- **User configuration (`~/.augent/config.yaml`):** set defaults for model_size, output_dir, notes_output_dir, clip_padding, context_words, tts_voice, and tts_speed. Per-call arguments always override config values. Falls back to `~/.augent/config.json` if PyYAML is not installed. No config file required — all values have sensible defaults.
+- **`disabled_tools` config key:** list tool names to hide from MCP clients. Disabled tools are removed from the `tools/list` response and cannot be called.
+
 ## [2026.3.20] - 2026-03-20
 
 ### Added
