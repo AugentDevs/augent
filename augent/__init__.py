@@ -93,7 +93,7 @@ except ImportError:
     separate_audio_stems = None
     get_vocal_stem = None
 
-__version__ = "2026.3.20"
+__version__ = "2026.3.21"
 __all__ = [
     # Core functions
     "search_audio",
