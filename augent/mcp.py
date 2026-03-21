@@ -21,6 +21,9 @@ Tools exposed:
 - clear_memory: Clear transcription memory
 - search_memory: Search across ALL stored transcriptions
 - separate_audio: Separate audio into stems (vocals, drums, bass, other) using Demucs v4
+- clip_export: Export a video clip from a URL for a specific time range
+- highlights: Export the best moments from a transcription as MP4 clips
+- tag: Add, remove, or list tags on transcriptions
 
 Usage:
   python -m augent.mcp
@@ -896,7 +899,7 @@ _ALL_TOOLS = [
                 },
                 "clip_padding": {
                     "type": "number",
-                    "description": "Seconds of padding around each highlight when exporting clips. Default: 10",
+                    "description": "Seconds of padding around each highlight when exporting clips. Default: 15",
                 },
                 "context_words": {
                     "type": "number",

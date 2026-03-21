@@ -232,7 +232,7 @@ query: "product recommendations" (optional, omit for auto mode)
 top_k: 5 (optional, number of highlights)
 model_size: "tiny" (optional, default)
 clip: false (optional, export each highlight as MP4)
-clip_padding: 10 (optional, seconds of padding around clips)
+clip_padding: 15 (optional, seconds of padding around clips)
 context_words: 40 (optional, words of context in focused mode)
 ```
 Returns `{mode, highlight_count, highlights: [{start, end, timestamp, text, score, mode}], clips, youtube_link}`
