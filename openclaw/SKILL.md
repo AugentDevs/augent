@@ -1,6 +1,6 @@
 ---
 name: augent
-description: Audio intelligence toolkit. Transcribe, search by keyword or meaning, take notes, detect chapters, identify speakers, separate audio, export clips, and text-to-speech — all local, all private. 17 MCP tools for audio.
+description: Audio intelligence toolkit. Transcribe, search by keyword or meaning, take notes, detect chapters, identify speakers, separate audio, export clips, tag, highlights, and text-to-speech — all local, all private. 19 MCP tools for audio.
 homepage: https://github.com/AugentDevs/Augent
 metadata: {"openclaw":{"emoji":"🎙","os":["darwin","linux","win32"],"requires":{"bins":["augent-mcp","ffmpeg"]},"install":[{"id":"uv","kind":"uv","package":"augent","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (uv)"},{"id":"pip","kind":"pip","package":"augent[all]","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (pip)"}]}}
 ---
@@ -64,7 +64,7 @@ pip install "augent[all]"
 
 ## Tools
 
-Augent exposes 17 MCP tools:
+Augent exposes 19 MCP tools:
 
 ### Core
 
@@ -97,6 +97,8 @@ Augent exposes 17 MCP tools:
 | `list_memories` | Browse all stored transcriptions by title, duration, and date. |
 | `memory_stats` | View memory statistics (file count, total duration). |
 | `clear_memory` | Clear the transcription memory to free disk space. |
+| `tag` | Add, remove, or list tags on transcriptions. Broad topic categories for organizing memories. |
+| `highlights` | Export the best moments from a transcription. Auto mode picks top moments; focused mode finds moments matching a topic. |
 
 ## Usage Examples
 
