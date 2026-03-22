@@ -17,7 +17,7 @@ import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List
 
 
 def _wikilink_name(md_path: str) -> str:
@@ -48,6 +48,7 @@ def compute_related_links(
     """
     try:
         import numpy as np
+
         from .embeddings import EMBEDDING_MODEL, _cosine_similarity
     except ImportError:
         return []
@@ -79,7 +80,7 @@ def compute_related_links(
         return []
 
     # Get target tags for shared-tag scoring
-    target_tags = set(t["name"] for t in memory.get_tags(cache_key))
+    target_tags = {t["name"] for t in memory.get_tags(cache_key)}
 
     # Build a lookup: audio_hash → (cache_key, md_path, title, tags)
     hash_to_info = {}
@@ -94,9 +95,9 @@ def compute_related_links(
             ).fetchall()
             if rows:
                 r = rows[0]
-                entry_tags = set(
+                entry_tags = {
                     t["name"] for t in memory.get_tags(r["cache_key"])
-                )
+                }
                 hash_to_info[entry["audio_hash"]] = {
                     "cache_key": r["cache_key"],
                     "md_path": r["md_path"] or "",
@@ -238,7 +239,7 @@ def generate_mocs(memory, min_members: int = 3) -> List[str]:
             "",
         ]
 
-        for link_name, title in sorted(member_links, key=lambda x: x[1]):
+        for link_name, _title in sorted(member_links, key=lambda x: x[1]):
             body_lines.append(f"- [[{link_name}]]")
         body_lines.append("")
 
