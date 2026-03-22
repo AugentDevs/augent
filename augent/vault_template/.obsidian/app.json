@@ -1,0 +1,12 @@
+{
+  "showFrontmatter": true,
+  "defaultViewMode": "preview",
+  "vimMode": false,
+  "attachmentFolderPath": "/",
+  "showLineNumber": false,
+  "strictLineBreaks": false,
+  "readableLineLength": true,
+  "alwaysUpdateLinks": true,
+  "newLinkFormat": "shortest",
+  "useMarkdownLinks": false
+}

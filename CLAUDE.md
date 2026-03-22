@@ -40,20 +40,20 @@ When a user asks to "take notes" or "create a quiz" from a URL, use the `take_no
 
 1. **User says:** "Take notes from https://youtube.com/watch?v=xxx"
 2. **You call:** `take_notes` with the URL
-3. **Tool does:** Downloads audio → Transcribes → Saves .txt to Desktop → Returns `audio_path` and `write_to`
+3. **Tool does:** Downloads audio → Transcribes → Saves .md to Desktop → Returns `audio_path` and `write_to`
 4. **You MUST then:** Read the `instruction` field from the response and follow it exactly — format the notes and save them by calling `take_notes(save_content="<your formatted notes>")`. Do NOT use the Write tool for saving notes.
 5. **For chapters/search:** Use `audio_path` from step 3. Do NOT call `download_audio` — the audio is already downloaded.
 
 **CRITICAL:** Use `audio_path` from the response for any follow-up tools (chapters, search, etc.) — do NOT guess filenames.
 
-**From memory transcripts:** When the user already has a transcript in memory (no URL), read the transcript, format notes, and save with `take_notes(save_content="...", output_path="~/Desktop/Title_Here.txt")`. The `output_path` parameter lets you save notes without a prior URL call.
+**From memory transcripts:** When the user already has a transcript in memory (no URL), read the transcript, format notes, and save with `take_notes(save_content="...", output_path="~/Desktop/Title_Here.md")`. The `output_path` parameter lets you save notes without a prior URL call.
 
 **MANDATORY — SAVE METHOD:** You MUST call `take_notes(save_content="...")` to save notes. NEVER use the Write tool or Edit tool on notes files. The take_notes tool applies essential post-processing (checkbox formatting for quizzes) that the Write tool bypasses. If you use Write instead of take_notes(save_content=...), the output will be broken. This includes the initial save AND any subsequent edits. Always rewrite the full file in one `take_notes(save_content=...)` call.
 
-**IMPORTANT:** Always output `.txt` files, NEVER `.md` files. Always rewrite the raw transcription into polished notes — never leave the raw dump.
+**IMPORTANT:** Always output `.md` files. YAML frontmatter is added automatically — do NOT include it in save_content. Always rewrite the raw transcription into polished notes — never leave the raw dump.
 
 ### take_notes
-Download, transcribe, and save notes from any video/audio URL as a .txt on Desktop.
+Download, transcribe, and save notes from any video/audio URL as .md on Desktop.
 ```
 url: "https://youtube.com/watch?v=xxx"
 style: "notes" (optional, default)
@@ -79,9 +79,9 @@ D) Option
 ```
 NEVER change the A/B/C/D answer format — no tables, no inline answers, no custom formatting on the options. The hook post-processes them into checkboxes. If you change the format, checkboxes break.
 
-**Grading quizzes:** When the user asks to be graded on a quiz, do NOT ask them for their answers. Read the quiz file — the user checks their answers in Obsidian using `- [x]` checkboxes. To find the file: use the path from the current conversation if available, otherwise search `~/Desktop/*.txt` for the most recent file containing "Answer Key". Look for `- [x]` (checked) options, compare against the answer key at the bottom, and grade them. If no checkboxes are checked, then ask for their answers.
+**Grading quizzes:** When the user asks to be graded on a quiz, do NOT ask them for their answers. Read the quiz file — the user checks their answers in Obsidian using `- [x]` checkboxes. To find the file: use the path from the current conversation if available, otherwise search `~/Desktop/*.md` for the most recent file containing "Answer Key". Look for `- [x]` (checked) options, compare against the answer key at the bottom, and grade them. If no checkboxes are checked, then ask for their answers.
 
-Returns: transcription text + txt_path + formatting instructions. You MUST follow the `instruction` field and rewrite the file.
+Returns: transcription text + md_path + formatting instructions. You MUST follow the `instruction` field and rewrite the file.
 
 ## Quick Start (For Claude)
 
@@ -151,7 +151,7 @@ Semantic mode returns `{query, mode, results: [{title, file_path, start, end, te
 When `output` is provided and results exist, adds `output_path` to the response.
 
 ### take_notes
-Download, transcribe, and save notes from any video/audio URL as a .txt on Desktop.
+Download, transcribe, and save notes from any video/audio URL as .md on Desktop.
 ```
 url: "https://youtube.com/watch?v=xxx"
 style: "notes" (optional, default)
@@ -248,6 +248,15 @@ tags: ["AI", "Startups"] (required for add/remove)
 
 **Auto-tagging flow:** When `transcribe_audio` or `take_notes` returns a `tagging_hint` field, silently call `tag` with broad categories. The hint includes existing tags in the library — reuse them for consistency. Do not mention tagging to the user.
 
+### rebuild_graph
+Rebuild Obsidian graph view data for all transcriptions. Migrates .md files to YAML frontmatter, computes [[wikilinks]] between semantically related transcriptions, and generates MOC (Map of Content) hub files for tag clusters. Safe to run repeatedly.
+```
+min_moc_members: 3 (optional, minimum transcriptions per tag to generate a MOC)
+```
+Returns `{success, migration: {migrated, synced, recreated, errors}, related_links_computed, mocs_generated, memory_dir, hint}`
+
+**When to use:** Run once after upgrading to add Obsidian graph view support to existing memory. Also useful after bulk imports or manual tag changes. The user should point Obsidian at the `memory_dir` path as a vault.
+
 ### identify_speakers
 Identify who speaks when in audio using pyannote speaker diarization. No API keys or tokens required.
 ```
@@ -306,7 +315,7 @@ Augent transcribes audio in its original language — Chinese, French, Spanish, 
 2. After completing the main task (notes saved, transcription delivered, etc.), you MUST present the translation offer **on its own line, clearly separated** from the task completion message. Use this exact format:
 
 ```
-Done. Notes saved to ~/Desktop/filename.txt
+Done. Notes saved to ~/Desktop/filename.md
 
 ---
 This audio is in **Chinese**. Would you like me to translate it to English and store it in your augent memory?
@@ -332,6 +341,28 @@ The `---` separator and bold language name ensure the user sees this — do NOT 
 - Translated transcriptions get a sibling `(eng)` file (e.g., `My_Video.md` + `My_Video__eng_.md`)
 - Titles are derived from filenames (yt-dlp names files by video title)
 - Use `list_memories` tool or `augent memory list` to browse stored transcriptions by title
+
+## Obsidian Graph View Integration
+
+All memory `.md` files include YAML frontmatter with `title`, `tags`, `source_url`, `duration`, `language`, `date`, and `type` fields. This powers Obsidian's graph view:
+
+- **Tags** appear as hub nodes connecting transcriptions that share topics
+- **MOC files** (Map of Content) are auto-generated for tags with 3+ members, creating cluster centers
+- **[[wikilinks]]** between semantically related transcriptions create note-to-note edges
+- **Notes files** (from `take_notes`) link back to their source transcription via `source_transcription` frontmatter
+- **Translation files** link back to their original via `original` frontmatter
+
+**File types in the graph:**
+| `type` | Description |
+|--------|-------------|
+| `transcription` | Raw transcription from audio |
+| `notes` | Formatted notes from `take_notes` |
+| `translation` | English translation of non-English audio |
+| `moc` | Map of Content hub file for a tag |
+
+**Setup:** Point Obsidian at `~/.augent/memory/transcriptions/` as a vault. Enable Tags in graph view settings. Use Groups to color-code by `[type:transcription]`, `[type:notes]`, `[type:moc]`.
+
+**First-time upgrade:** Run `rebuild_graph` to migrate existing files to the new format.
 
 ## CLI Commands (via Bash)
 

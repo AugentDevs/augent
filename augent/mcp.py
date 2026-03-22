@@ -909,6 +909,19 @@ _ALL_TOOLS = [
             "required": ["audio_path"],
         },
     },
+    {
+        "name": "rebuild_graph",
+        "description": "Rebuild Obsidian graph view data for all transcriptions. Migrates .md files to YAML frontmatter format, computes [[wikilinks]] between semantically related transcriptions, and generates MOC (Map of Content) hub files for tag clusters. Safe to run repeatedly. Run this once to upgrade existing memory for Obsidian.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "min_moc_members": {
+                    "type": "number",
+                    "description": "Minimum transcriptions per tag to generate a MOC file. Default: 3",
+                },
+            },
+        },
+    },
 ]
 
 
@@ -978,6 +991,8 @@ def handle_tools_call(id: Any, params: dict) -> None:
             result = handle_highlights(arguments)
         elif tool_name == "tag":
             result = handle_tag(arguments)
+        elif tool_name == "rebuild_graph":
+            result = handle_rebuild_graph(arguments)
         else:
             send_error(id, -32602, f"Unknown tool: {tool_name}")
             return
@@ -1609,7 +1624,7 @@ def _get_style_instruction(
     base_prefix = (
         "IMPORTANT: You MUST now format the notes and save them by calling take_notes again with save_content. "
         "Do NOT use the Write or Edit tools on notes files — ALWAYS use take_notes(save_content=...) for both initial save and any subsequent edits. "
-        "Do NOT leave the raw transcription as-is. Do NOT create .md files. "
+        "Do NOT leave the raw transcription as-is. Do NOT include YAML frontmatter — it is added automatically. "
         "For any follow-up tool calls (chapters, search, deep_search, etc.), use the audio_path field from this response — do NOT guess the filename. "
     )
     base_suffix = (
@@ -1752,14 +1767,15 @@ def _get_style_instruction(
 
 
 _last_notes_path = None
+_last_notes_metadata = {}  # Stored during initial take_notes for frontmatter in save_content
 
 
 def handle_take_notes(arguments: dict) -> dict:
-    """Handle take_notes tool call - download, transcribe, save .txt to Desktop."""
+    """Handle take_notes tool call - download, transcribe, save .md to Desktop."""
     import os
     import re
 
-    global _last_notes_path
+    global _last_notes_path, _last_notes_metadata
 
     # --- Save mode: write formatted notes to a file ---
     save_content = arguments.get("save_content")
@@ -1779,6 +1795,40 @@ def handle_take_notes(arguments: dict) -> dict:
             r"^(\s*)([A-D]\))", r"- [ ] \2", save_content, flags=re.MULTILINE
         )
         has_checkboxes = "- [ ]" in save_content
+
+        # Strip any existing frontmatter from save_content (we generate our own)
+        if save_content.lstrip().startswith("---\n"):
+            stripped = save_content.lstrip()
+            end_idx = stripped.find("\n---\n", 4)
+            if end_idx != -1:
+                save_content = stripped[end_idx + 5:]
+
+        # Auto-prepend YAML frontmatter for Obsidian graph view
+        if _last_notes_metadata:
+            from .memory import TranscriptionMemory
+
+            meta = _last_notes_metadata
+            # Build wikilink to source transcription
+            extra = {}
+            if meta.get("source_transcription_filename"):
+                extra["source_transcription"] = (
+                    f'"[[{meta["source_transcription_filename"]}]]"'
+                )
+            if meta.get("style"):
+                extra["style"] = meta["style"]
+
+            frontmatter = TranscriptionMemory._build_frontmatter(
+                title=meta.get("title", ""),
+                tags=meta.get("tags", []),
+                source_url=meta.get("source_url", ""),
+                duration=meta.get("duration_formatted", ""),
+                language=meta.get("language", ""),
+                date=meta.get("date", ""),
+                type_="notes",
+                extra=extra,
+            )
+            save_content = frontmatter + "\n" + save_content
+
         with open(_last_notes_path, "w", encoding="utf-8") as f:
             f.write(save_content)
         return {
@@ -1831,23 +1881,23 @@ def handle_take_notes(arguments: dict) -> dict:
 
     get_transcription_memory().update_source_url(audio_path, model_size, url)
 
-    # Step 3: Save raw transcription as .txt on Desktop
+    # Step 3: Save raw transcription as .md on Desktop
     # Clean title for filename (remove special chars)
     safe_title = re.sub(r"[^\w\s\-]", "", title)
     safe_title = re.sub(r"\s+", " ", safe_title).strip()
     if not safe_title:
         safe_title = "notes"
-    txt_filename = f"{safe_title}.txt"
-    txt_path = os.path.join(output_dir, txt_filename)
+    md_filename = f"{safe_title}.md"
+    md_path = os.path.join(output_dir, md_filename)
 
-    with open(txt_path, "w", encoding="utf-8") as f:
+    with open(md_path, "w", encoding="utf-8") as f:
         f.write(f"Source: {url}\n")
         f.write(f"Duration: {int(duration // 60)}:{int(duration % 60):02d}\n")
         f.write(f"Title: {title}\n")
         f.write("=" * 60 + "\n\n")
         f.write(text)
 
-    _last_notes_path = txt_path
+    _last_notes_path = md_path
 
     # Style-specific formatting instructions
     instruction = _get_style_instruction(
@@ -1855,23 +1905,23 @@ def handle_take_notes(arguments: dict) -> dict:
         read_aloud=read_aloud,
         output_dir=output_dir,
         safe_title=safe_title,
-        txt_path=txt_path,
+        txt_path=md_path,
     )
 
     # Cap transcription in response to prevent token overflow in Claude Code.
-    # Full transcript is already saved to txt_path — Claude reads the file.
+    # Full transcript is already saved to md_path — Claude reads the file.
     max_chars = 12000
     if len(text) > max_chars:
         truncated_text = (
             text[:max_chars]
-            + f"\n\n[... truncated — full transcript saved to {txt_path} — read the file for complete text ...]"
+            + f"\n\n[... truncated — full transcript saved to {md_path} — read the file for complete text ...]"
         )
     else:
         truncated_text = text
 
     response = {
         "success": True,
-        "write_to": txt_path,
+        "write_to": md_path,
         "audio_path": audio_path,
         "instruction": instruction,
         "title": title,
@@ -1931,8 +1981,42 @@ def handle_take_notes(arguments: dict) -> dict:
             hint += f"Existing tags in this library: {existing_names}. Reuse these where they fit before creating new ones. "
         hint += "Do not mention tagging to the user."
         response["tagging_hint"] = hint
+
+        # Store metadata for frontmatter generation in save_content
+        _source_sanitized = _mem._sanitize_filename(
+            _mem._title_from_path(audio_path)
+        )
+        from datetime import datetime as _dt
+
+        _last_notes_metadata = {
+            "title": title,
+            "tags": assigned_names,
+            "source_url": url,
+            "duration_formatted": f"{int(duration // 60)}:{int(duration % 60):02d}",
+            "language": result["language"],
+            "date": _dt.now().strftime("%Y-%m-%d"),
+            "style": style,
+            "source_transcription_filename": _source_sanitized,
+            "cache_key": _ck,
+        }
     except Exception:
         pass
+
+    # Ensure metadata is set even if tagging failed
+    if not _last_notes_metadata:
+        from datetime import datetime as _dt2
+
+        _last_notes_metadata = {
+            "title": title,
+            "tags": [],
+            "source_url": url,
+            "duration_formatted": f"{int(duration // 60)}:{int(duration % 60):02d}",
+            "language": result["language"],
+            "date": _dt2.now().strftime("%Y-%m-%d"),
+            "style": style,
+            "source_transcription_filename": "",
+            "cache_key": "",
+        }
 
     return response
 
@@ -2555,6 +2639,37 @@ def handle_tag(arguments: dict) -> dict:
         return {"action": "list", "cache_key": cache_key, "tags": tag_list}
     else:
         return {"error": f"Unknown action: {action}"}
+
+
+def handle_rebuild_graph(arguments: dict) -> dict:
+    """Handle rebuild_graph tool call — rebuild Obsidian graph view data."""
+    from .graph import rebuild_graph
+    from .memory import get_transcription_memory
+
+    memory = get_transcription_memory()
+    min_members = arguments.get("min_moc_members", 3)
+
+    result = rebuild_graph(memory)
+
+    # Re-run MOC generation with custom threshold if specified
+    if min_members != 3:
+        from .graph import generate_mocs
+
+        moc_paths = generate_mocs(memory, min_members=min_members)
+        result["mocs_generated"] = len(moc_paths)
+
+    return {
+        "success": True,
+        "migration": result["migration"],
+        "related_links_computed": result["related_computed"],
+        "mocs_generated": result["mocs_generated"],
+        "memory_dir": str(memory.md_dir),
+        "hint": (
+            "Point Obsidian at the memory_dir path as a vault (or add it to an existing vault). "
+            "Enable Tags in graph view settings to see tag hub nodes. "
+            "Use graph view Groups to color-code by type (transcription, notes, moc, translation)."
+        ),
+    }
 
 
 def handle_clip_export(arguments: dict) -> dict:

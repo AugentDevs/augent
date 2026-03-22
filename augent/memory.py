@@ -225,14 +225,58 @@ class TranscriptionMemory:
         sanitized = re.sub(r"[_\s]+", "_", sanitized)
         return sanitized[:200] if sanitized else "untitled"
 
+    @staticmethod
+    def _yaml_escape(text: str) -> str:
+        """Escape a string for safe use in YAML double-quoted values."""
+        return text.replace("\\", "\\\\").replace('"', '\\"')
+
+    @staticmethod
+    def _build_frontmatter(
+        title: str,
+        tags: Optional[List[str]] = None,
+        source: str = "",
+        source_url: str = "",
+        duration: str = "",
+        language: str = "",
+        date: str = "",
+        type_: str = "transcription",
+        extra: Optional[Dict[str, str]] = None,
+    ) -> str:
+        """Build YAML frontmatter string for Obsidian graph view integration."""
+        lines = ["---", f'title: "{TranscriptionMemory._yaml_escape(title)}"']
+        if tags:
+            lines.append("tags:")
+            for tag in tags:
+                # Obsidian splits bare multi-word tags on spaces.
+                # Hyphenate to keep them as a single tag node in graph view.
+                safe_tag = tag.strip().replace(" ", "-")
+                lines.append(f"  - {safe_tag}")
+        if source:
+            lines.append(f'source: "{source}"')
+        if source_url:
+            lines.append(f'source_url: "{source_url}"')
+        if duration:
+            lines.append(f'duration: "{duration}"')
+        if language:
+            lines.append(f"language: {language}")
+        if date:
+            lines.append(f"date: {date}")
+        lines.append(f"type: {type_}")
+        if extra:
+            for k, v in extra.items():
+                lines.append(f"{k}: {v}")
+        lines.append("---")
+        return "\n".join(lines) + "\n"
+
     def _write_markdown(
         self,
         title: str,
         transcription: Dict[str, Any],
         file_path: str,
         source_url: str = "",
+        cache_key: str = "",
     ) -> Optional[Path]:
-        """Write a markdown transcription file. Returns the path or None on error."""
+        """Write a markdown transcription file with YAML frontmatter. Returns the path or None on error."""
         try:
             sanitized = self._sanitize_filename(title)
             md_path = self.md_dir / f"{sanitized}.md"
@@ -241,24 +285,33 @@ class TranscriptionMemory:
             mins = int(duration // 60)
             secs = int(duration % 60)
 
-            lines = [
+            # Get tags from DB if cache_key available
+            tags = []
+            if cache_key:
+                try:
+                    tag_list = self.get_tags(cache_key)
+                    tags = sorted([t["name"] for t in tag_list])
+                except Exception:
+                    pass
+
+            frontmatter = self._build_frontmatter(
+                title=title,
+                tags=tags,
+                source=os.path.basename(file_path),
+                source_url=source_url,
+                duration=f"{mins}:{secs:02d}",
+                language=transcription.get("language", "unknown"),
+                date=datetime.now().strftime("%Y-%m-%d"),
+                type_="transcription",
+            )
+
+            body_lines = [
+                "",
                 f"# {title}",
                 "",
-                f"**Source:** `{os.path.basename(file_path)}`  ",
-                f"**Duration:** {mins}:{secs:02d}  ",
-                f"**Language:** {transcription.get('language', 'unknown')}  ",
+                "## Transcription",
+                "",
             ]
-            if source_url:
-                lines.append(f"**URL:** {source_url}  ")
-            lines.extend(
-                [
-                    "",
-                    "---",
-                    "",
-                    "## Transcription",
-                    "",
-                ]
-            )
 
             segments = transcription.get("segments", [])
             for seg in segments:
@@ -266,17 +319,78 @@ class TranscriptionMemory:
                 m = int(start // 60)
                 s = int(start % 60)
                 text = seg.get("text", "").strip()
-                lines.append(f"**[{m}:{s:02d}]** {text}")
-                lines.append("")
+                body_lines.append(f"**[{m}:{s:02d}]** {text}")
+                body_lines.append("")
 
             if not segments:
-                lines.append(transcription.get("text", ""))
-                lines.append("")
+                body_lines.append(transcription.get("text", ""))
+                body_lines.append("")
 
-            md_path.write_text("\n".join(lines), encoding="utf-8")
+            content = frontmatter + "\n".join(body_lines)
+            md_path.write_text(content, encoding="utf-8")
             return md_path
         except Exception:
             return None
+
+    def _sync_markdown_tags(self, cache_key: str) -> None:
+        """Sync tags from DB to the markdown file's YAML frontmatter."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                row = conn.execute(
+                    "SELECT md_path, title, file_path, source_url, duration, "
+                    "language, created_at FROM transcriptions WHERE cache_key = ?",
+                    (cache_key,),
+                ).fetchone()
+                if not row or not row["md_path"]:
+                    return
+
+                md_path = Path(row["md_path"])
+                if not md_path.exists():
+                    return
+
+                content = md_path.read_text(encoding="utf-8")
+
+                # Extract body (everything after frontmatter)
+                if content.startswith("---\n"):
+                    end_idx = content.find("\n---\n", 4)
+                    if end_idx == -1:
+                        return
+                    body = content[end_idx + 5:]
+                else:
+                    # Old format without frontmatter — skip (migration handles these)
+                    return
+
+                # Get current tags from DB
+                tags = self.get_tags(cache_key)
+                tag_names = sorted([t["name"] for t in tags])
+
+                # Regenerate frontmatter from DB data
+                duration = row["duration"] or 0
+                mins = int(duration // 60)
+                secs = int(duration % 60)
+                created = row["created_at"]
+                date_str = (
+                    datetime.fromtimestamp(created).strftime("%Y-%m-%d")
+                    if created
+                    else datetime.now().strftime("%Y-%m-%d")
+                )
+
+                frontmatter = self._build_frontmatter(
+                    title=row["title"] or "",
+                    tags=tag_names,
+                    source=os.path.basename(row["file_path"] or ""),
+                    source_url=row["source_url"] or "",
+                    duration=f"{mins}:{secs:02d}",
+                    language=row["language"] or "unknown",
+                    date=date_str,
+                    type_="transcription",
+                )
+
+                new_content = frontmatter + body
+                md_path.write_text(new_content, encoding="utf-8")
+        except Exception:
+            pass
 
     def get(self, file_path: str, model_size: str) -> Optional[MemorizedTranscription]:
         """
@@ -373,8 +487,50 @@ class TranscriptionMemory:
                         ),
                     )
                     conn.commit()
+
+            # Chronological neighbor link — prevents orphan nodes in Obsidian graph.
+            # Links new transcription to the most recent previous one so every file
+            # has at least one [[wikilink]] connection.
+            if md_path:
+                self._link_chronological_neighbor(cache_key, md_path)
         except Exception:
             # Silently fail on memory write errors
+            pass
+
+    def _link_chronological_neighbor(
+        self, cache_key: str, md_path: Path
+    ) -> None:
+        """Link a new transcription to the most recent previous one via [[wikilink]]."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                row = conn.execute(
+                    "SELECT md_path FROM transcriptions "
+                    "WHERE cache_key != ? AND md_path IS NOT NULL AND md_path != '' "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    (cache_key,),
+                ).fetchone()
+                if not row or not row[0]:
+                    return
+
+                neighbor_path = Path(row[0])
+                if not neighbor_path.exists():
+                    return
+
+                neighbor_name = neighbor_path.stem
+                content = md_path.read_text(encoding="utf-8")
+
+                # Don't duplicate if already linked
+                if f"[[{neighbor_name}]]" in content:
+                    return
+
+                # Append or extend Related section
+                if "## Related" in content:
+                    content = content.rstrip() + f"\n- [[{neighbor_name}]]\n"
+                else:
+                    content = content.rstrip() + f"\n\n## Related\n\n- [[{neighbor_name}]]\n"
+
+                md_path.write_text(content, encoding="utf-8")
+        except Exception:
             pass
 
     def store_translation(
@@ -426,19 +582,37 @@ class TranscriptionMemory:
                     secs = int(duration % 60)
                     src_basename = os.path.basename(row["file_path"] or file_path)
 
-                    lines = [
+                    # Get tags from original transcription
+                    tags = self.get_tags(cache_key)
+                    tag_names = sorted([t["name"] for t in tags])
+
+                    # Link back to original transcription
+                    orig_sanitized = self._sanitize_filename(title)
+                    extra = {"original": f'"[[{orig_sanitized}]]"'}
+
+                    frontmatter = self._build_frontmatter(
+                        title=eng_title,
+                        tags=tag_names,
+                        source=src_basename,
+                        source_url=source_url,
+                        duration=f"{mins}:{secs:02d}",
+                        language="en (translated)",
+                        date=datetime.now().strftime("%Y-%m-%d"),
+                        type_="translation",
+                        extra=extra,
+                    )
+
+                    body_lines = [
+                        "",
                         f"# {eng_title}",
                         "",
-                        f"**Source:** `{src_basename}`  ",
-                        f"**Duration:** {mins}:{secs:02d}  ",
-                        "**Language:** en (translated)  ",
+                        "## Translation",
+                        "",
+                        translated_text,
+                        "",
                     ]
-                    if source_url:
-                        lines.append(f"**URL:** {source_url}  ")
-                    lines.extend(
-                        ["", "---", "", "## Translation", "", translated_text, ""]
-                    )
-                    translated_md_path.write_text("\n".join(lines), encoding="utf-8")
+                    content = frontmatter + "\n".join(body_lines)
+                    translated_md_path.write_text(content, encoding="utf-8")
 
                     conn.execute(
                         """UPDATE transcriptions
@@ -1059,7 +1233,7 @@ class TranscriptionMemory:
         category: str = "manual",
         source: str = "manual",
     ) -> List[dict]:
-        """Add tags to a transcription. Creates tags if they don't exist."""
+        """Add tags to a transcription. Creates tags if they don't exist. Syncs to .md frontmatter."""
         import time
 
         now = time.time()
@@ -1089,10 +1263,12 @@ class TranscriptionMemory:
                         {"name": tag_name, "category": category, "source": source}
                     )
                 conn.commit()
+        # Sync tags to .md file frontmatter (outside lock — file I/O)
+        self._sync_markdown_tags(cache_key)
         return added
 
     def remove_tags(self, cache_key: str, tags: List[str]) -> int:
-        """Remove tags from a transcription. Returns number removed."""
+        """Remove tags from a transcription. Returns number removed. Syncs to .md frontmatter."""
         removed = 0
         with self._lock:
             with sqlite3.connect(self.db_path) as conn:
@@ -1111,6 +1287,8 @@ class TranscriptionMemory:
                         )
                         removed += conn.total_changes
                 conn.commit()
+        # Sync tags to .md file frontmatter (outside lock — file I/O)
+        self._sync_markdown_tags(cache_key)
         return removed
 
     def get_tags(self, cache_key: str) -> List[dict]:

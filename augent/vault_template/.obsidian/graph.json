@@ -1,0 +1,32 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    { "query": "path:MOC", "color": { "a": 1, "rgb": 14692657 } },
+    { "query": "tag:#AI", "color": { "a": 1, "rgb": 16612884 } },
+    { "query": "tag:#Science", "color": { "a": 1, "rgb": 16565273 } },
+    { "query": "tag:#Cooking", "color": { "a": 1, "rgb": 5361510 } },
+    { "query": "tag:#Programming", "color": { "a": 1, "rgb": 3382000 } },
+    { "query": "tag:#Music", "color": { "a": 1, "rgb": 9926138 } },
+    { "query": "tag:#Fitness", "color": { "a": 1, "rgb": 15754645 } },
+    { "query": "tag:#DIY", "color": { "a": 1, "rgb": 2148759 } },
+    { "query": "tag:#Gaming", "color": { "a": 1, "rgb": 2275535 } }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": -1.5,
+  "nodeSizeMultiplier": 1.2,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.1,
+  "repelStrength": 15,
+  "linkStrength": 1,
+  "linkDistance": 80,
+  "scale": 1,
+  "close": false
+}

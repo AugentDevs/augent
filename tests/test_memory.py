@@ -79,6 +79,79 @@ class TestTranscriptionMemory:
         assert result_base.text == "Base transcription"
         assert result_large.text == "Large transcription"
 
+    def test_chronological_neighbor_link(self, temp_memory):
+        """New transcriptions link to the most recent previous one to prevent orphans."""
+        # Create first transcription
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp") as f:
+            f.write(b"first audio file")
+            path1 = f.name
+
+        temp_memory.set(path1, "tiny", {
+            "text": "First", "language": "en", "duration": 10.0,
+            "words": [], "segments": [{"start": 0.0, "end": 10.0, "text": "First"}],
+        })
+        first_name = temp_memory._sanitize_filename(
+            temp_memory._title_from_path(path1)
+        )
+        os.unlink(path1)
+
+        # Create second transcription
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp") as f:
+            f.write(b"second audio file")
+            path2 = f.name
+
+        temp_memory.set(path2, "tiny", {
+            "text": "Second", "language": "en", "duration": 15.0,
+            "words": [], "segments": [{"start": 0.0, "end": 15.0, "text": "Second"}],
+        })
+        second_name = temp_memory._sanitize_filename(
+            temp_memory._title_from_path(path2)
+        )
+        os.unlink(path2)
+
+        # Second file should contain a [[wikilink]] to the first
+        second_md = temp_memory.md_dir / f"{second_name}.md"
+        assert second_md.exists()
+        second_content = second_md.read_text()
+        assert f"[[{first_name}]]" in second_content
+        assert "## Related" in second_content
+
+    def test_chronological_neighbor_no_duplicate(self, temp_memory):
+        """Neighbor link should not duplicate if file already links to it."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp") as f:
+            f.write(b"audio A")
+            path1 = f.name
+        temp_memory.set(path1, "tiny", {
+            "text": "A", "language": "en", "duration": 5.0,
+            "words": [], "segments": [],
+        })
+        first_name = temp_memory._sanitize_filename(
+            temp_memory._title_from_path(path1)
+        )
+        os.unlink(path1)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp") as f:
+            f.write(b"audio B")
+            path2 = f.name
+        temp_memory.set(path2, "tiny", {
+            "text": "B", "language": "en", "duration": 5.0,
+            "words": [], "segments": [],
+        })
+
+        # Set again (re-transcribe) — should not duplicate the link
+        temp_memory.set(path2, "tiny", {
+            "text": "B updated", "language": "en", "duration": 5.0,
+            "words": [], "segments": [],
+        })
+        second_name = temp_memory._sanitize_filename(
+            temp_memory._title_from_path(path2)
+        )
+        os.unlink(path2)
+
+        second_md = temp_memory.md_dir / f"{second_name}.md"
+        second_content = second_md.read_text()
+        assert second_content.count(f"[[{first_name}]]") == 1
+
     def test_clear_memory(self, temp_memory, sample_audio_file):
         transcription = {
             "text": "Test",
@@ -158,7 +231,7 @@ class TestTranscriptionMemory:
         assert "Hello world" in content
         assert "[0:00]" in content
 
-    def test_markdown_contains_metadata(self, temp_memory, sample_audio_file):
+    def test_markdown_has_yaml_frontmatter(self, temp_memory, sample_audio_file):
         transcription = {
             "text": "Test content",
             "language": "en",
@@ -170,8 +243,39 @@ class TestTranscriptionMemory:
 
         md_files = list(temp_memory.md_dir.glob("*.md"))
         content = md_files[0].read_text()
-        assert "**Duration:** 2:05" in content
-        assert "**Language:** en" in content
+        assert content.startswith("---\n")
+        assert "\n---\n" in content[4:]
+
+    def test_markdown_frontmatter_contains_metadata(self, temp_memory, sample_audio_file):
+        transcription = {
+            "text": "Test content",
+            "language": "en",
+            "duration": 125.0,
+            "words": [],
+            "segments": [{"start": 0.0, "end": 5.0, "text": "Test content"}],
+        }
+        temp_memory.set(sample_audio_file, "base", transcription)
+
+        md_files = list(temp_memory.md_dir.glob("*.md"))
+        content = md_files[0].read_text()
+        assert 'duration: "2:05"' in content
+        assert "language: en" in content
+        assert "type: transcription" in content
+        assert "date: " in content
+
+    def test_markdown_frontmatter_contains_title(self, temp_memory, sample_audio_file):
+        transcription = {
+            "text": "Test",
+            "language": "en",
+            "duration": 5.0,
+            "words": [],
+            "segments": [],
+        }
+        temp_memory.set(sample_audio_file, "base", transcription)
+
+        md_files = list(temp_memory.md_dir.glob("*.md"))
+        content = md_files[0].read_text()
+        assert "title: " in content
 
     def test_get_by_title(self, temp_memory, sample_audio_file):
         transcription = {
@@ -401,6 +505,63 @@ class TestTagging:
         )
         extracted = temp_memory.auto_tag(stored_transcription, text)
         assert extracted == []  # auto_tag is deprecated, always returns []
+
+    def test_add_tags_syncs_to_markdown(self, temp_memory):
+        """Test that adding tags updates the .md file's YAML frontmatter."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp") as f:
+            f.write(b"fake audio for tag sync test")
+            audio_path = f.name
+
+        transcription = {
+            "text": "Test content for tag sync",
+            "language": "en",
+            "duration": 10.0,
+            "words": [],
+            "segments": [{"start": 0.0, "end": 10.0, "text": "Test content"}],
+        }
+        temp_memory.set(audio_path, "tiny", transcription)
+        audio_hash = TranscriptionMemory.hash_audio_file(audio_path)
+        cache_key = f"{audio_hash}:tiny"
+
+        # Add tags
+        temp_memory.add_tags(cache_key, ["AI", "Startups"])
+
+        # Read the .md file and check frontmatter contains tags
+        md_files = list(temp_memory.md_dir.glob("*.md"))
+        assert len(md_files) == 1
+        content = md_files[0].read_text()
+        assert "tags:" in content
+        assert "  - AI" in content
+        assert "  - Startups" in content
+        os.unlink(audio_path)
+
+    def test_remove_tags_syncs_to_markdown(self, temp_memory):
+        """Test that removing tags updates the .md file's YAML frontmatter."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp") as f:
+            f.write(b"fake audio for tag remove sync test")
+            audio_path = f.name
+
+        transcription = {
+            "text": "Test content for remove sync",
+            "language": "en",
+            "duration": 10.0,
+            "words": [],
+            "segments": [{"start": 0.0, "end": 10.0, "text": "Test content"}],
+        }
+        temp_memory.set(audio_path, "tiny", transcription)
+        audio_hash = TranscriptionMemory.hash_audio_file(audio_path)
+        cache_key = f"{audio_hash}:tiny"
+
+        # Add then remove
+        temp_memory.add_tags(cache_key, ["AI", "Startups", "Health"])
+        temp_memory.remove_tags(cache_key, ["Startups"])
+
+        md_files = list(temp_memory.md_dir.glob("*.md"))
+        content = md_files[0].read_text()
+        assert "  - AI" in content
+        assert "  - Health" in content
+        assert "  - Startups" not in content
+        os.unlink(audio_path)
 
     def test_clear_removes_tags(self, temp_memory, stored_transcription):
         temp_memory.add_tags(stored_transcription, ["AI"])

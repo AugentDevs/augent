@@ -4,6 +4,23 @@ All notable changes to Augent are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.3.22] - 2026-03-22
+
+### Added
+
+- **Obsidian graph view integration:** all memory `.md` files now include YAML frontmatter (`title`, `tags`, `source_url`, `duration`, `language`, `date`, `type`) for full Obsidian graph view support. Tags appear as hub nodes, [[wikilinks]] connect semantically related transcriptions, and MOC (Map of Content) files cluster topics.
+- **`rebuild_graph` MCP tool:** one-shot command to migrate existing memory files to YAML frontmatter, compute related [[wikilinks]] via embedding similarity, and generate MOC hub files for tag clusters. Safe to run repeatedly.
+- **MOC (Map of Content) auto-generation:** tags with 3+ members automatically get a hub `.md` file linking all their transcriptions — creates visible topic clusters in the graph.
+- **Semantic related links:** transcriptions with similar content are connected via [[wikilinks]] in a `## Related` section, computed from document-level embedding cosine similarity + shared tag bonus.
+- **`augent/graph.py` module:** new module for all Obsidian graph operations — related links, MOC generation, markdown migration, and full graph rebuild.
+
+### Changed
+
+- **`take_notes` output switched from `.txt` to `.md`:** notes files now use `.md` extension with auto-generated YAML frontmatter (`type: notes`, `source_transcription` wikilink, inherited tags, style). No manual frontmatter needed — it's prepended automatically in the `save_content` handler.
+- **Tag changes sync to `.md` frontmatter:** `add_tags` and `remove_tags` now update the YAML frontmatter in the corresponding `.md` file in real time. Tags exist in both the DB (source of truth) and the file (Obsidian-facing).
+- **Translation files include frontmatter:** translated `.md` files now have YAML frontmatter with `type: translation` and `original: [[source_file]]` wikilink back to the original transcription.
+- **Memory `.md` files restructured:** header metadata moved from bold text (`**Duration:** 9:47`) into YAML frontmatter. Body starts with `# Title` followed by `## Transcription`.
+
 ## [2026.3.21] - 2026-03-21
 
 ### Added
