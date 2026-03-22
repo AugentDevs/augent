@@ -268,6 +268,20 @@ Open: **http://127.0.0.1:8282**
 
 <br />
 
+## Obsidian Graph View
+
+Every transcription builds a node. Every shared tag builds a connection. Your audio memory becomes a navigable knowledge graph — entirely automatic.
+
+<picture>
+  <img src="./images/obsidian-graph.png" alt="Augent knowledge graph in Obsidian">
+</picture>
+
+Point Obsidian at `~/.augent/memory/transcriptions/` as a dedicated vault. Every `take_notes` call, every transcription, every tag creates structure: YAML frontmatter, `[[wikilinks]]` between related content, and MOC hub files that cluster topics. Run `rebuild_graph` once to upgrade existing memory. The graph grows on its own from there.
+
+Use your main Obsidian vault for personal notes. Use the Augent vault for your audio knowledge network. Two vaults, two purposes. [Full guide](https://docs.augent.app/obsidian/overview).
+
+<br />
+
 ## Multilingual
 
 Augent transcribes audio in its **original language** with full accuracy — powered by OpenAI's Whisper, supporting **99 languages** including Chinese, French, Spanish, Japanese, Arabic, Hindi, Korean, German, Russian, Portuguese, and many more. Language is auto-detected, no configuration needed. Translation to English is handled by Claude (or your LLM), producing far better translations than any local model.
