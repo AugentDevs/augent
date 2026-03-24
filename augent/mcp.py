@@ -329,7 +329,7 @@ def handle_initialize(id: Any, params: dict) -> None:
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "augent", "version": "2026.3.22"},
+                "serverInfo": {"name": "augent", "version": "2026.3.24"},
             },
         }
     )

@@ -4,7 +4,7 @@ All notable changes to Augent are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [2026.3.22] - 2026-03-22
+## [2026.3.24] - 2026-03-24
 
 ### Added
 
