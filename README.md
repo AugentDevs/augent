@@ -219,7 +219,7 @@ Full CLI for terminal-based workflows. Works standalone or with any agent.
 
 ## Eyes & Ears
 
-Someone explains their entire workflow in a video. Augent transcribes it, builds the workflow files, extracts the sequencing, the decision points, the tool stack. Every piece structured into something an agent can act on.
+Someone explains their entire workflow in a video. Augent transcribes it, builds the workflow files, maps the sequencing, the decision points, the tool stack. Every piece structured into something an agent can act on.
 
 But some steps are inherently visual. Augent detects where visual context is needed and exports multiple screenshots at those moments, giving the agent frame-by-frame context of the flow being described. Audio intelligence plus visual context equals a complete, replicable system.
 
