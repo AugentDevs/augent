@@ -224,19 +224,22 @@ Someone explains their entire workflow in a video. Augent transcribes it, builds
 But some steps are inherently visual. Augent detects where visual context is needed and exports multiple screenshots at those moments, giving the agent frame-by-frame context of the flow being described. Audio intelligence plus visual context equals a complete, replicable system.
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
-graph LR
-    A[Expert explains<br/>workflow or automation] --> B[Augent transcribes,<br/>structures, and builds<br/>workflow files]
-    B --> C{Visual<br/>context?}
-    C -->|Yes| D[Export screenshots]
-    C -->|No| E[Ready to run]
-    D --> E
+graph TB
+    A["Expert explains workflow"] --> B["Augent transcribes + structures"]
+    B --> C["Builds workflow files"]
+    C --> D["Visual context needed?"]
 
-    style A fill:#1a1a1a,stroke:#00F060,color:#fff
-    style B fill:#1a1a1a,stroke:#00F060,color:#fff
-    style C fill:#1a1a1a,stroke:#fff,color:#fff
-    style D fill:#1a1a1a,stroke:#00F060,color:#fff
-    style E fill:#1a1a1a,stroke:#00F060,color:#fff
+    D --> E["Export screenshots"]
+    D --> F["Package ready"]
+    D --> G["Ready to run"]
+
+    style A fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style B fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style C fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style D fill:#0d2618,stroke:#00f060,color:#00f060,stroke-width:2px
+    style E fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
+    style F fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
+    style G fill:#0a0a0a,stroke:#00f060,color:#00f060,stroke-width:2px
 ```
 
 **[Read more →](https://docs.augent.app/agents/eyes-and-ears)**
