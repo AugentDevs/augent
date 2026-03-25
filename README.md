@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>Any amount of content, seconds to find it. Fully local, fully private.</strong>
+  <strong>The wormhole stays open. Fully local. Fully private.</strong>
 </p>
 
 <p align="center">
@@ -21,17 +21,20 @@
 <p align="center">
   <a href="#mcp-tools">MCP Tools</a> ·
   <a href="#cli">CLI</a> ·
-  <a href="#web-ui">Web UI</a> ·
+  <a href="#claude-code-skill">Claude Code Skill</a> ·
   <a href="#openclaw">OpenClaw</a> ·
+  <a href="#web-ui">Web UI</a> ·
   <a href="https://augent.app">Website</a> ·
   <a href="https://docs.augent.app">Docs</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="mailto:hello@augent.app">Contact</a>
 </p>
 
+If the answer is trapped in audio or video, this is the way through.
+
 **Augent** turns any audio or video source into structured, searchable intelligence for agents. Give it URLs or files. It downloads, transcribes, indexes, and stores everything in persistent memory. Search by keyword or meaning, find where concepts intersect, identify speakers, generate chapters and notes, batch process entire libraries, and more. One install, full pipeline, entirely on your machine.
 
-Hours of content, seconds to master it.
+If you want the quality info from content without sitting through it, the fastest way, this is it.
 
 **Preferred setup:** run the one-line installer in your terminal. One command installs Augent, all dependencies, and the MCP server config. Works on macOS and Linux. Windows: install via pip. Works with Claude Code, Codex, and any MCP client. New install? Start here: [Getting started](https://docs.augent.app/getting-started).
 
@@ -214,56 +217,37 @@ Full CLI for terminal-based workflows. Works standalone or with any agent.
 
 <br />
 
-## Web UI
+## Claude Code Skill
 
-Local web interface. Runs 100% locally. No internet, no API keys, no data leaves your machine.
+Install the skill to teach Claude how to use Augent's tools effectively. Without it, Claude can call the tools but won't know the optimal workflows for note-taking, translation, search, tagging, and more.
 
 ```bash
-augent-web
+mkdir -p ~/.claude/skills/augent
+curl -o ~/.claude/skills/augent/SKILL.md \
+  https://raw.githubusercontent.com/AugentDevs/Augent/main/skills/augent/SKILL.md
 ```
 
-Open: **http://127.0.0.1:8282**
+Works globally across all projects. One install, every conversation benefits.
 
-**Search view:**
-1. **Upload** an audio file or **paste a YouTube/video URL** to download audio directly
-2. **Enter keywords** separated by commas
-3. **Click SEARCH** and results stream live with timestamps and context
-4. **YouTube timestamps** are automatically hyperlinked when the source is YouTube
+<br />
 
-**Clip export:**
-- Click the **film icon** on any search result to create a visual region on the waveform, or **drag on the waveform** to select any range manually
-- **Nudge buttons** (±1s / ±5s) on each edge for precise boundary adjustment
-- **Preview** plays only the selected range so you hear exactly what will be exported
-- **Export MP4** downloads only the selected segment — not the full video
-- Keyboard shortcuts: `Space` preview, `Enter` export, `Esc` close
+## OpenClaw
 
-**Memory Explorer:**
-- Browse **all** stored transcriptions, including files transcribed via MCP or CLI. Every tool writes to the same memory.
-- View full transcripts with clickable YouTube timestamps
-- **Delete** individual transcriptions from memory
-- **Show Audio** to reveal the source audio file in Finder
-- **Show Transcript** to reveal the `.md` transcript file in Finder. Drag it into a Claude Code session to run the full MCP pipeline on a previously transcribed file.
-- **Share as HTML** to download a self-contained, shareable transcript page
-- **Search across all memories** by keyword to find matches across every transcription in your library
+Augent is available as an [OpenClaw](https://github.com/openclaw/openclaw) skill on [ClawHub](https://clawhub.ai/augentdevs/augent).
 
-**Source URL persistence:** When audio is downloaded from any URL — YouTube, Twitter/X, TikTok, Instagram, SoundCloud, and 1000+ sites — the source URL is permanently stored by file hash. Any future search or transcription of that file, even weeks later or from a different path, automatically links back to the original source. No need to re-enter the URL.
+**Install via ClawHub:**
 
-<details>
-<summary>Web UI options</summary>
+```bash
+npx clawhub@latest install augent
+```
 
-| Command | Description |
-|:--------|:------------|
-| `augent-web` | Start on port 8282 |
-| `augent-web --port 8585` | Custom port |
+**Or set up manually:**
 
-</details>
+```bash
+augent setup openclaw
+```
 
-<picture>
-  <img src="./images/webui-1.png" alt="Augent Web UI - Upload">
-</picture>
-<picture>
-  <img src="./images/webui-2.png" alt="Augent Web UI - Results">
-</picture>
+This installs the skill manifest and configures the MCP server in one command.
 
 <br />
 
@@ -279,13 +263,13 @@ Point Obsidian at `~/.augent/memory/transcriptions/` as a dedicated vault. Every
 
 Use your main Obsidian vault for personal notes. Use the Augent vault for your audio knowledge network. Two vaults, two purposes. [Full guide](https://docs.augent.app/obsidian/overview).
 
-> **Using Claude Code with Obsidian?** Set up [obsidian-claude](https://github.com/AugentDevs/obsidian-claude) — it fixes a race condition where Obsidian silently reverts Claude's edits, and makes every `.txt` and `.md` file on your Mac open directly in Obsidian.
+> **Using Claude Code or Codex with Obsidian?** Set up [obsidian-claude](https://github.com/AugentDevs/obsidian-claude) to make every `.txt` and `.md` file on your Mac open directly in Obsidian, with automatic sync for external edits.
 
 <br />
 
 ## Multilingual
 
-Augent transcribes audio in its **original language** with full accuracy — powered by OpenAI's Whisper, supporting **99 languages** including Chinese, French, Spanish, Japanese, Arabic, Hindi, Korean, German, Russian, Portuguese, and many more. Language is auto-detected, no configuration needed. Translation to English is handled by Claude (or your LLM), producing far better translations than any local model.
+Augent transcribes audio in its **original language** with full accuracy, powered by OpenAI's Whisper, supporting **99 languages** including Chinese, French, Spanish, Japanese, Arabic, Hindi, Korean, German, Russian, Portuguese, and many more. Language is auto-detected, no configuration needed. Translation to English is handled by Claude (or your LLM), producing far better translations than any local model.
 
 - When a transcription returns a non-English language, the MCP response includes a **translation offer**
 - Accepting stores a clean English `(eng)` sibling file in memory alongside the original
@@ -323,43 +307,62 @@ tts_speed: 1.0             # TTS speed multiplier
 disabled_tools: []         # Hide tools from MCP clients
 ```
 
-Per-call arguments always override config. No config file needed — all values have sensible defaults.
+Per-call arguments always override config. No config file needed, all values have sensible defaults.
 
 **[Configuration docs →](https://docs.augent.app/guides/configuration)**
 
 <br />
 
-## Claude Code Skill
+## Web UI
 
-Install the skill to teach Claude how to use Augent's tools effectively. Without it, Claude can call the tools but won't know the optimal workflows for note-taking, translation, search, tagging, and more.
-
-```bash
-mkdir -p ~/.claude/skills/augent
-curl -o ~/.claude/skills/augent/SKILL.md \
-  https://raw.githubusercontent.com/AugentDevs/Augent/main/skills/augent/SKILL.md
-```
-
-Works globally across all projects. One install, every conversation benefits.
-
-<br />
-
-## OpenClaw
-
-Augent is available as an [OpenClaw](https://github.com/openclaw/openclaw) skill on [ClawHub](https://clawhub.ai/augentdevs/augent).
-
-**Install via ClawHub:**
+Local web interface. Runs 100% locally. No internet, no API keys, no data leaves your machine.
 
 ```bash
-npx clawhub@latest install augent
+augent-web
 ```
 
-**Or set up manually:**
+Open: **http://127.0.0.1:8282**
 
-```bash
-augent setup openclaw
-```
+**Search view:**
+1. **Upload** an audio file or **paste a YouTube/video URL** to download audio directly
+2. **Enter keywords** separated by commas
+3. **Click SEARCH** and results stream live with timestamps and context
+4. **YouTube timestamps** are automatically hyperlinked when the source is YouTube
 
-This installs the skill manifest and configures the MCP server in one command.
+**Clip export:**
+- Click the **film icon** on any search result to create a visual region on the waveform, or **drag on the waveform** to select any range manually
+- **Nudge buttons** (±1s / ±5s) on each edge for precise boundary adjustment
+- **Preview** plays only the selected range so you hear exactly what will be exported
+- **Export MP4** downloads only the selected segment, not the full video
+- Keyboard shortcuts: `Space` preview, `Enter` export, `Esc` close
+
+**Memory Explorer:**
+- Browse **all** stored transcriptions, including files transcribed via MCP or CLI. Every tool writes to the same memory.
+- View full transcripts with clickable YouTube timestamps
+- **Delete** individual transcriptions from memory
+- **Show Audio** to reveal the source audio file in Finder
+- **Show Transcript** to reveal the `.md` transcript file in Finder. Drag it into a Claude Code session to run the full MCP pipeline on a previously transcribed file.
+- **Share as HTML** to download a self-contained, shareable transcript page
+- **Search across all memories** by keyword to find matches across every transcription in your library
+
+**Source URL persistence:** When audio is downloaded from any URL (YouTube, Twitter/X, TikTok, Instagram, SoundCloud, and 1000+ sites) the source URL is permanently stored by file hash. Any future search or transcription of that file, even weeks later or from a different path, automatically links back to the original source. No need to re-enter the URL.
+
+<details>
+<summary>Web UI options</summary>
+
+| Command | Description |
+|:--------|:------------|
+| `augent-web` | Start on port 8282 |
+| `augent-web --port 8585` | Custom port |
+
+</details>
+
+<picture>
+  <img src="./images/webui-1.png" alt="Augent Web UI - Upload">
+</picture>
+<picture>
+  <img src="./images/webui-2.png" alt="Augent Web UI - Results">
+</picture>
 
 <br />
 
