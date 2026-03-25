@@ -64,9 +64,7 @@ class TestConfig:
 
     def test_json_config_overrides_defaults(self):
         """JSON config values override defaults."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"model_size": "small", "clip_padding": 30}, f)
             f.flush()
             config._CONFIG_PATH = "/nonexistent/config.yaml"
@@ -83,9 +81,7 @@ class TestConfig:
 
     def test_unknown_keys_ignored(self):
         """Unknown keys in config file are silently ignored."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"model_size": "base", "unknown_key": "should_be_ignored"}, f)
             f.flush()
             config._CONFIG_PATH = "/nonexistent/config.yaml"
