@@ -225,20 +225,21 @@ But some steps are inherently visual. Augent detects where visual context is nee
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
-flowchart LR
-    A["Expert explains workflow"] --> B["Augent transcribes, structures, builds workflow files"]
-    B --> C{"Visual context?"}
-    C -->|"Yes"| D["Export screenshots"]
-    C -->|"No"| E["Workflow package ready"]
-    D --> E
-    E --> F["Agent replicates the system"]
+sequenceDiagram
+    participant Expert
+    participant Augent
+    participant Builder
+    participant Visual
+    participant Agent
 
-    style A fill:#1a1a1a,stroke:#00F060,color:#fff
-    style B fill:#1a1a1a,stroke:#00F060,color:#fff
-    style C fill:#1a1a1a,stroke:#fff,color:#fff
-    style D fill:#1a1a1a,stroke:#00F060,color:#fff
-    style E fill:#1a1a1a,stroke:#00F060,color:#fff
-    style F fill:#1a1a1a,stroke:#00F060,color:#fff
+    Expert->>Augent: Explains workflow or automation
+    Augent->>Augent: Transcribes and structures it
+    Augent->>Builder: Workflow files, sequencing, decision points
+    Builder->>Builder: Detects where visual context is needed
+    Builder->>Visual: Export multiple screenshots
+    Visual->>Builder: Frame-by-frame context packaged
+    Builder->>Agent: Complete workflow package
+    Agent->>Agent: Replicates the system end-to-end
 ```
 
 **[Read more →](https://docs.augent.app/agents/eyes-and-ears)**
