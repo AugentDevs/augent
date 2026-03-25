@@ -217,6 +217,36 @@ Full CLI for terminal-based workflows. Works standalone or with any agent.
 
 <br />
 
+## Eyes & Ears
+
+Someone explains their entire workflow in a video. Augent transcribes it, builds the workflow files, extracts the sequencing, the decision points, the tool stack. Every piece structured into something an agent can act on.
+
+But some steps are inherently visual. Augent detects where visual context is needed and exports multiple screenshots at those moments, giving the agent frame-by-frame context of the flow being described. Audio intelligence plus visual context equals a complete, replicable system.
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart TD
+    A["Expert explains workflow or automation"] --> B["Augent transcribes and structures it"]
+    B --> C["Builds workflow files and sequencing"]
+    C --> D{"Visual context?"}
+    D -->|"Yes"| E["Export multiple screenshots"]
+    D -->|"No"| F["Complete workflow package"]
+    E --> F
+    F --> G["Agent replicates the system"]
+
+    style A fill:#1a1a1a,stroke:#00F060,color:#fff
+    style B fill:#1a1a1a,stroke:#00F060,color:#fff
+    style C fill:#1a1a1a,stroke:#00F060,color:#fff
+    style D fill:#1a1a1a,stroke:#fff,color:#fff
+    style E fill:#1a1a1a,stroke:#00F060,color:#fff
+    style F fill:#1a1a1a,stroke:#00F060,color:#fff
+    style G fill:#1a1a1a,stroke:#00F060,color:#fff
+```
+
+**[Read more →](https://docs.augent.app/agents/eyes-and-ears)**
+
+<br />
+
 ## Claude Code Skill
 
 Install the skill to teach Claude how to use Augent's tools effectively. Without it, Claude can call the tools but won't know the optimal workflows for note-taking, translation, search, tagging, and more.
