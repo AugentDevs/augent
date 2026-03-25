@@ -281,7 +281,7 @@ npx clawhub@latest install augent
 augent setup openclaw
 ```
 
-This installs the skill manifest and configures the MCP server in one command.
+If you installed Augent with `install.sh`, OpenClaw is detected and configured automatically. These commands are for manual setup or if you installed via pip.
 
 <br />
 
