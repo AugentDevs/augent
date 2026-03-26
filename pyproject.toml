@@ -54,7 +54,7 @@ web = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
     "python-multipart>=0.0.6",
-    "huggingface-hub>=0.20.0,<1.8.0",
+    "huggingface-hub>=0.20.0,<1.9.0",
 ]
 clips = [
     "pydub>=0.25.0",
@@ -79,7 +79,7 @@ all = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
     "python-multipart>=0.0.6",
-    "huggingface-hub>=0.20.0,<1.8.0",
+    "huggingface-hub>=0.20.0,<1.9.0",
     "pydub>=0.25.0",
     "pyannote-audio>=3.1.0",
     "sentence-transformers>=2.2.0",
