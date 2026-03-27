@@ -121,20 +121,20 @@ graph TB
 
 ```
 augent/
-├── mcp.py          # MCP server — tools for agents
+├── mcp.py          # MCP server — 21 tools for agents
 ├── config.py       # User configuration (~/.augent/config.yaml)
 ├── core.py         # Transcription engine (faster-whisper)
 ├── search.py       # Keyword search
-├── embeddings.py   # Semantic search + chapters
+├── embeddings.py   # Semantic search, chapters, visual scoring
 ├── speakers.py     # Speaker diarization (pyannote-audio)
 ├── separator.py    # Audio source separation (Demucs v4)
 ├── tts.py          # Text-to-speech (Kokoro)
 ├── memory.py       # Three-layer memory (SQLite)
 ├── graph.py        # Obsidian graph view (wikilinks, MOCs, frontmatter)
-├── cli.py          # CLI interface
-├── web.py          # Web UI (FastAPI)
+├── clips.py        # Audio clip extraction around matches
 ├── export.py       # Export formats (JSON, CSV, SRT, VTT, MD)
-└── clips.py        # Video clip export
+├── cli.py          # CLI interface
+└── web.py          # Web UI (FastAPI)
 ```
 
 <br />
