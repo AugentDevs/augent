@@ -925,7 +925,7 @@ _ALL_TOOLS = [
     },
     {
         "name": "visual",
-        "description": "Smart visual context extraction from video. Analyzes the transcript to identify moments where visual context is needed (UI demos, screen recordings, spatial actions, dashboards, code output) and extracts frames ONLY at those moments. Skips talking heads, B-roll, and audio-sufficient content. Works standalone or chained with clip_export.",
+        "description": "Extract visual context from a video at moments that matter. Three modes: (1) Query mode (default): describe what you need visual context for and the tool finds those moments in the transcript, then extracts frames. (2) Auto mode: autonomously detects moments where the speaker implies visual content (UI actions, screen recordings, demonstrations). (3) Manual mode: extract frames at specific timestamps. Frames are stored in augent memory alongside the transcription and embedded in the .md file as Obsidian wikilinks.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -933,25 +933,46 @@ _ALL_TOOLS = [
                     "type": "string",
                     "description": "Path to a video file (MP4, MKV, etc). Can be output from clip_export.",
                 },
+                "url": {
+                    "type": "string",
+                    "description": "Video URL (YouTube, etc). Downloads the video automatically if video_path is not provided.",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "What you need visual context for. The tool searches the transcript semantically and extracts frames at matching moments. Examples: 'connecting Gmail to the agent', 'the dashboard configuration', 'where he sets up the branching logic'.",
+                },
+                "timestamps": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "Manual mode: list of timestamps (in seconds) to extract frames at. Overrides query and auto detection.",
+                },
+                "auto": {
+                    "type": "boolean",
+                    "description": "Auto mode: autonomously detect visual moments from transcript (UI actions, demonstrations, spatial references). Default: false. Ignored if query or timestamps are provided.",
+                },
                 "model_size": {
                     "type": "string",
                     "description": "Whisper model size for transcription. Default: 'tiny'",
                     "enum": ["tiny", "base", "small", "medium", "large"],
                 },
-                "visual_threshold": {
-                    "type": "number",
-                    "description": "Minimum visual necessity score (0.0-1.0) for frame extraction. Lower = more frames, higher = only obvious visual moments. Default: 0.4",
-                },
                 "max_frames": {
                     "type": "number",
                     "description": "Maximum frames to extract. Default: 30",
                 },
-                "output_dir": {
-                    "type": "string",
-                    "description": "Directory to save frames. Default: ~/Desktop/visual/<video_name>/",
+                "top_k": {
+                    "type": "number",
+                    "description": "Number of transcript matches to extract frames for in query mode. Default: 10",
+                },
+                "context_words": {
+                    "type": "number",
+                    "description": "Words of context around each match in query mode. Default: 40",
+                },
+                "clear": {
+                    "type": "boolean",
+                    "description": "Remove all previously extracted frames and the visual context .md for this video. Use to redo or clean up. Default: false",
                 },
             },
-            "required": ["video_path"],
+            "required": [],
         },
     },
 ]
@@ -1988,6 +2009,13 @@ def handle_take_notes(arguments: dict) -> dict:
             "instruction"
         ] += f"\n\nAfter saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
 
+    # Visual context hint — let Claude know visual is available for this video
+    response["visual_hint"] = (
+        f"If the user needs visual context (screenshots of UI, dashboards, workflows shown in the video), "
+        f'use the `visual` tool with url: "{url}" and a query describing what they need to see. '
+        f"Example: visual(url=\"{url}\", query=\"setting up the automation\")"
+    )
+
     # Semantic tagging — assign existing tags based on content similarity
     try:
         from .embeddings import semantic_tag
@@ -2706,6 +2734,33 @@ def handle_rebuild_graph(arguments: dict) -> dict:
     }
 
 
+def _get_obsidian_vault():
+    """Get the first open Obsidian vault path from Obsidian's config."""
+    from pathlib import Path
+
+    config_path = Path.home() / "Library" / "Application Support" / "obsidian" / "obsidian.json"
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path) as f:
+            data = json.loads(f.read())
+        vaults = data.get("vaults", {})
+        # Prefer the open vault, otherwise take the first one
+        for v in vaults.values():
+            if v.get("open"):
+                p = Path(v["path"])
+                if p.is_dir():
+                    return p
+        # No open vault, take any
+        for v in vaults.values():
+            p = Path(v["path"])
+            if p.is_dir():
+                return p
+    except Exception:
+        pass
+    return None
+
+
 def _score_visual_necessity(segments: list, segment_embeddings=None) -> list:
     """Score each transcript segment for visual necessity (0.0-1.0).
 
@@ -2836,19 +2891,46 @@ def _score_visual_necessity(segments: list, segment_embeddings=None) -> list:
 
 
 def handle_visual(arguments: dict) -> dict:
-    """Handle visual tool call — smart transcript-guided frame extraction."""
+    """Handle visual tool call — extract frames at moments that matter."""
     import shutil
+    from pathlib import Path
 
     from .config import get_config
     from .core import transcribe_audio
-    from .embeddings import _get_or_compute_embeddings
+    from .embeddings import (
+        _cosine_similarity,
+        _get_embedding_model_cache,
+        _get_or_compute_embeddings,
+        _ranked_semantic_search,
+    )
     from .memory import get_transcription_memory
 
     cfg = get_config()
 
     video_path = arguments.get("video_path")
-    if not video_path:
-        raise ValueError("Missing required parameter: video_path")
+    url = arguments.get("url")
+
+    if not video_path and not url:
+        raise ValueError("Provide video_path (local file) or url (downloads video automatically).")
+
+    if url and not video_path:
+        # Download video from URL using yt-dlp
+        download_dir = os.path.expanduser("~/Downloads")
+        cmd = [
+            "yt-dlp",
+            "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "--merge-output-format", "mp4",
+            "--no-playlist",
+            "-o", os.path.join(download_dir, "%(title)s.%(ext)s"),
+            "--print", "after_move:filepath",
+            url,
+        ]
+        dl_result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if dl_result.returncode != 0:
+            raise RuntimeError(f"Video download failed: {dl_result.stderr.strip()[:300]}")
+        video_path = dl_result.stdout.strip().split("\n")[-1]
+        if not os.path.exists(video_path):
+            raise RuntimeError(f"Video download completed but file not found: {video_path}")
 
     video_path = os.path.expanduser(video_path)
     if not os.path.exists(video_path):
@@ -2857,29 +2939,69 @@ def handle_visual(arguments: dict) -> dict:
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         raise RuntimeError("ffmpeg and ffprobe are required. Install with: brew install ffmpeg")
 
+    query = arguments.get("query")
+    timestamps = arguments.get("timestamps")
+    auto_mode = arguments.get("auto", False)
+    clear = arguments.get("clear", False)
     model_size = arguments.get("model_size", cfg.get("model_size", "tiny"))
-    visual_threshold = arguments.get("visual_threshold", 0.4)
     max_frames = int(arguments.get("max_frames", cfg.get("visual_context_max_frames", 30)))
-    output_dir = arguments.get("output_dir")
+    top_k = int(arguments.get("top_k", 10))
+    context_words = int(arguments.get("context_words", 40))
 
     if max_frames < 1:
         raise ValueError("max_frames must be at least 1")
-    if not 0.0 <= visual_threshold <= 1.0:
-        raise ValueError("visual_threshold must be between 0.0 and 1.0")
 
-    # Derive output directory
-    if not output_dir:
-        video_stem = os.path.splitext(os.path.basename(video_path))[0]
-        safe_name = _re.sub(r"[^\w\s-]", "", video_stem).strip()[:80]
-        output_dir = os.path.join(
-            os.path.expanduser(cfg.get("notes_output_dir", "~/Desktop")),
-            "visual",
-            safe_name,
-        )
+    # Handle clear: remove all frames and visual context .md for this video
+    video_stem_for_clear = os.path.splitext(os.path.basename(video_path))[0]
+    safe_name_for_clear = _re.sub(r"[^\w\s-]", "", video_stem_for_clear).strip()[:80]
+    if clear:
+        vault_dir = _get_obsidian_vault()
+        removed_frames = 0
+        removed_md = False
+        # Remove frames from vault
+        if vault_dir:
+            frames_dir = vault_dir / "External Files" / "visual" / safe_name_for_clear
+            if frames_dir.is_dir():
+                for f in frames_dir.glob("*.png"):
+                    f.unlink()
+                    removed_frames += 1
+                try:
+                    frames_dir.rmdir()
+                except OSError:
+                    pass
+        # Remove visual context .md from Desktop
+        md_name = f"{safe_name_for_clear} - Visual Context.md"
+        md_desktop = Path(os.path.expanduser(cfg.get("notes_output_dir", "~/Desktop"))) / md_name
+        if md_desktop.exists():
+            md_desktop.unlink()
+            removed_md = True
+        # Also remove from vault External Files if hard-linked
+        if vault_dir:
+            md_vault = vault_dir / "External Files" / md_name
+            if md_vault.exists():
+                md_vault.unlink()
+                removed_md = True
+
+        if not query and not timestamps and not auto_mode:
+            return {
+                "cleared": True,
+                "removed_frames": removed_frames,
+                "removed_md": removed_md,
+                "video_path": video_path,
+            }
+
+    # Determine mode
+    if timestamps:
+        mode = "manual"
+    elif query:
+        mode = "query"
+    elif auto_mode:
+        mode = "auto"
     else:
-        output_dir = os.path.expanduser(output_dir)
-
-    os.makedirs(output_dir, exist_ok=True)
+        raise ValueError(
+            "Provide one of: query (describe what you need visual context for), "
+            "timestamps (list of seconds), or auto: true (autonomous detection)."
+        )
 
     # Probe video duration
     ffprobe_cmd = [
@@ -2900,66 +3022,141 @@ def handle_visual(arguments: dict) -> dict:
             return f"{h}:{m:02d}:{s:02d}"
         return f"{m}:{s:02d}"
 
-    # Stage 1: Transcribe (reuses cache)
+    # Transcribe (reuses cache)
     transcription = transcribe_audio(video_path, model_size)
     segments = transcription["segments"]
 
-    if not segments:
+    if not segments and mode != "manual":
         return {
             "video_path": video_path,
-            "output_dir": output_dir,
+            "mode": mode,
             "frame_count": 0,
             "analyzed_segments": 0,
-            "visual_segments": 0,
             "video_duration": round(video_duration, 1),
             "video_duration_formatted": _fmt_ts(video_duration),
             "frames": [],
-            "hint": "No transcript segments found. The video may have no speech.",
+            "hint": "No transcript segments found. The video may have no speech. Try manual mode with timestamps.",
         }
 
-    # Get embeddings for semantic scoring
+    # Memory setup
     memory = get_transcription_memory()
     audio_hash = memory.hash_audio_file(video_path)
-    try:
+
+    # Build extraction targets: list of (timestamp, score, reason, transcript_context)
+    targets = []
+
+    if mode == "manual":
+        for ts in timestamps[:max_frames]:
+            ts = float(ts)
+            # Find nearest segment for context
+            context = ""
+            if segments:
+                nearest = min(segments, key=lambda s: abs(s.get("start", 0) - ts))
+                seg_idx = segments.index(nearest)
+                parts = []
+                for j in range(max(0, seg_idx - 1), min(len(segments), seg_idx + 2)):
+                    parts.append(segments[j].get("text", "").strip())
+                context = " ".join(parts)
+            targets.append((ts, 1.0, "manual", context))
+
+    elif mode == "query":
+        # Use deep_search infrastructure to find matching moments
         segment_embeddings = _get_or_compute_embeddings(segments, audio_hash)
-    except Exception:
+
+        embed_model = _get_embedding_model_cache().get()
+        query_embedding = embed_model.encode(
+            query, convert_to_numpy=True, show_progress_bar=False
+        )
+
+        segments_meta = [
+            {"seg": seg, "seg_idx": i, "file_segments": segments}
+            for i, seg in enumerate(segments)
+        ]
+
+        results = _ranked_semantic_search(
+            query_embedding,
+            segment_embeddings,
+            segments_meta,
+            query,
+            top_k,
+            context_words,
+            dedup_seconds=5.0,
+        )
+
+        for r in results[:max_frames]:
+            ts = r["start"] + 1.0  # Offset into the visual moment
+            targets.append((ts, round(r["similarity"], 3), f"query match: {query}", r["text"]))
+
+    elif mode == "auto":
+        # Autonomous detection using pattern + semantic scoring
         segment_embeddings = None
+        try:
+            segment_embeddings = _get_or_compute_embeddings(segments, audio_hash)
+        except Exception:
+            pass
 
-    # Stage 2: Score each segment for visual necessity
-    scored = _score_visual_necessity(segments, segment_embeddings)
+        scored = _score_visual_necessity(segments, segment_embeddings)
 
-    # Filter to segments above threshold, sort by score descending
-    qualifying = [(idx, score, reason) for idx, score, reason in scored if score >= visual_threshold]
-    qualifying.sort(key=lambda x: x[1], reverse=True)
+        # Filter, sort by score, cap
+        qualifying = [(idx, score, reason) for idx, score, reason in scored if score >= 0.4]
+        qualifying.sort(key=lambda x: x[1], reverse=True)
+        qualifying = qualifying[:max_frames]
+        qualifying.sort(key=lambda x: segments[x[0]].get("start", 0))
 
-    # Cap at max_frames
-    qualifying = qualifying[:max_frames]
+        # Deduplicate within 3 seconds
+        deduped = []
+        for idx, score, reason in qualifying:
+            ts = segments[idx].get("start", 0)
+            if deduped:
+                last_ts = segments[deduped[-1][0]].get("start", 0)
+                if abs(ts - last_ts) < 3.0:
+                    if score > deduped[-1][1]:
+                        deduped[-1] = (idx, score, reason)
+                    continue
+            deduped.append((idx, score, reason))
 
-    # Re-sort by timestamp for chronological frame extraction
-    qualifying.sort(key=lambda x: segments[x[0]].get("start", 0))
+        for idx, score, reason in deduped:
+            seg = segments[idx]
+            ts = seg.get("start", 0) + 1.0
+            parts = []
+            for j in range(max(0, idx - 1), min(len(segments), idx + 2)):
+                parts.append(segments[j].get("text", "").strip())
+            targets.append((ts, score, reason, " ".join(parts)))
 
-    # Deduplicate: merge segments within 3 seconds of each other (keep higher score)
-    deduped = []
-    for idx, score, reason in qualifying:
-        ts = segments[idx].get("start", 0)
-        if deduped:
-            last_ts = segments[deduped[-1][0]].get("start", 0)
-            if abs(ts - last_ts) < 3.0:
-                # Keep the higher-scoring one
-                if score > deduped[-1][1]:
-                    deduped[-1] = (idx, score, reason)
-                continue
-        deduped.append((idx, score, reason))
+    # Clamp timestamps to video bounds
+    targets = [(min(max(ts, 0.1), video_duration - 0.1), score, reason, ctx) for ts, score, reason, ctx in targets]
 
-    # Stage 3: Extract frames at qualifying timestamps using seek-based ffmpeg
+    # Sort chronologically
+    targets.sort(key=lambda t: t[0])
+
+    # Frame storage
+    video_stem = os.path.splitext(os.path.basename(video_path))[0]
+    safe_name = _re.sub(r"[^\w\s-]", "", video_stem).strip()[:80]
+    # Short prefix for frame filenames (unique per video, readable in Obsidian)
+    name_prefix = _re.sub(r"[^\w]", "_", safe_name).strip("_")[:40].lower().rstrip("_")
+
+    # Frames go directly into the Obsidian vault so ![[]] embeds resolve.
+    # The .md goes to Desktop — augent-obsidian hard-links it into the vault.
+    # PNGs can't be hard-linked (only .md/.txt), so we write them into the vault directly.
+    vault_dir = _get_obsidian_vault()
+
+    if vault_dir:
+        desktop_dir = str(vault_dir / "External Files" / "visual" / safe_name)
+    else:
+        desktop_dir = os.path.join(
+            os.path.expanduser(cfg.get("notes_output_dir", "~/Desktop")),
+            "visual",
+            safe_name,
+        )
+    os.makedirs(desktop_dir, exist_ok=True)
+
+    # Extract frames
     frame_info = []
-    for frame_num, (seg_idx, score, reason) in enumerate(deduped):
-        seg = segments[seg_idx]
-        # Extract 1 second after segment start (speaker has started describing, visual is likely on screen)
-        ts = seg.get("start", 0) + 1.0
-        ts = min(ts, video_duration - 0.1)  # Don't seek past end
-
-        out_path = os.path.join(output_dir, f"frame_{frame_num + 1:04d}.png")
+    for frame_num, (ts, score, reason, context) in enumerate(targets):
+        # Unique filename: videoname_07m19s.png
+        m, s = divmod(int(ts), 60)
+        fname = f"{name_prefix}_{m:02d}m{s:02d}s.png"
+        desktop_path = os.path.join(desktop_dir, fname)
 
         cmd = [
             "ffmpeg", "-y",
@@ -2968,88 +3165,71 @@ def handle_visual(arguments: dict) -> dict:
             "-frames:v", "1",
             "-vf", "scale='min(1280,iw)':-1",
             "-q:v", "2",
-            out_path,
+            desktop_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
+        if result.returncode != 0 or not os.path.exists(desktop_path):
             continue
-
-        if not os.path.exists(out_path):
-            continue
-
-        # Build context: the segment text + neighboring segments for fuller context
-        context_parts = []
-        for j in range(max(0, seg_idx - 1), min(len(segments), seg_idx + 2)):
-            context_parts.append(segments[j].get("text", "").strip())
-        context_text = " ".join(context_parts)
 
         frame_info.append({
-            "path": out_path,
+            "path": desktop_path,
+            "filename": fname,
             "timestamp": round(ts, 1),
             "timestamp_formatted": _fmt_ts(ts),
-            "visual_score": round(score, 2),
-            "transcript": context_text,
+            "score": round(score, 2) if isinstance(score, float) else score,
             "reason": reason,
+            "transcript": context,
         })
 
-    # For very long segments (>8s) that scored high, extract a second frame at midpoint
-    extra_frames = []
-    for entry in list(frame_info):
-        seg_idx_match = None
-        for seg_idx, score, reason in deduped:
-            seg = segments[seg_idx]
-            if abs(seg.get("start", 0) + 1.0 - entry["timestamp"]) < 0.5:
-                seg_idx_match = seg_idx
-                break
-        if seg_idx_match is not None:
-            seg = segments[seg_idx_match]
-            seg_duration = seg.get("end", 0) - seg.get("start", 0)
-            if seg_duration > 8.0 and len(frame_info) + len(extra_frames) < max_frames:
-                mid_ts = seg.get("start", 0) + seg_duration / 2
-                mid_path = os.path.join(output_dir, f"frame_{len(frame_info) + len(extra_frames) + 1:04d}.png")
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-ss", str(mid_ts),
-                    "-i", video_path,
-                    "-frames:v", "1",
-                    "-vf", "scale='min(1280,iw)':-1",
-                    "-q:v", "2",
-                    mid_path,
-                ]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                if result.returncode == 0 and os.path.exists(mid_path):
-                    extra_frames.append({
-                        "path": mid_path,
-                        "timestamp": round(mid_ts, 1),
-                        "timestamp_formatted": _fmt_ts(mid_ts),
-                        "visual_score": entry["visual_score"],
-                        "transcript": entry["transcript"],
-                        "reason": entry["reason"] + " (midpoint)",
-                    })
+    # Create visual context .md on Desktop with frame embeds.
+    # augent-obsidian hard-links it into the vault automatically.
+    md_path = None
+    if frame_info:
+        try:
+            md_name = f"{safe_name} - Visual Context.md"
+            md_path = os.path.join(
+                os.path.expanduser(cfg.get("notes_output_dir", "~/Desktop")),
+                md_name,
+            )
 
-    frame_info.extend(extra_frames)
-    frame_info.sort(key=lambda f: f["timestamp"])
+            md_lines = [
+                f"# {video_stem} — Visual Context",
+                "",
+                f"**Query:** {query}" if query else "**Mode:** auto",
+                f"**Duration:** {_fmt_ts(video_duration)}",
+                f"**Frames:** {len(frame_info)}",
+                "",
+                "---",
+                "",
+            ]
 
-    # Renumber files in chronological order
-    for i, fi in enumerate(frame_info):
-        new_path = os.path.join(output_dir, f"frame_{i + 1:04d}.png")
-        if fi["path"] != new_path:
-            os.rename(fi["path"], new_path)
-            fi["path"] = new_path
+            for fi in frame_info:
+                md_lines.append(f"### {fi['timestamp_formatted']}")
+                md_lines.append("")
+                md_lines.append(f"![[{fi['filename']}]]")
+                md_lines.append("")
+                if fi.get("transcript"):
+                    clean_transcript = _re.sub(r"\*\*(.+?)\*\*", r"\1", fi["transcript"])
+                    md_lines.append(f"> {clean_transcript[:300]}")
+                    md_lines.append("")
 
-    skipped = len(segments) - len(deduped)
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(md_lines))
+        except Exception:
+            md_path = None
 
     return {
         "video_path": video_path,
-        "output_dir": output_dir,
+        "mode": mode,
+        "query": query if mode == "query" else None,
         "frame_count": len(frame_info),
         "analyzed_segments": len(segments),
-        "visual_segments": len(deduped),
-        "skipped_segments": skipped,
         "video_duration": round(video_duration, 1),
         "video_duration_formatted": _fmt_ts(video_duration),
+        "frames_dir": desktop_dir,
+        "md_path": md_path,
         "frames": frame_info,
-        "hint": "Use the Read tool to view any frame PNG. Each frame includes the transcript of what the speaker was saying at that moment.",
+        "hint": "Use the Read tool to view any frame PNG. Each frame includes the transcript of what was being said at that moment.",
     }
 
 

@@ -258,22 +258,48 @@ Returns `{success, migration: {migrated, synced, recreated, errors}, related_lin
 **When to use:** Run once after upgrading to add Obsidian graph view support to existing memory. Also useful after bulk imports or manual tag changes. The user should point Obsidian at the `memory_dir` path as a vault.
 
 ### visual
-Smart visual context extraction from video. Analyzes the transcript to identify moments where visual context is needed (UI demos, screen recordings, spatial actions, dashboards, code output) and extracts frames ONLY at those moments. Skips talking heads, B-roll, and audio-sufficient content.
+Extract visual context from a video at moments that matter. Three modes:
+
+**Query mode (default, recommended):** Describe what you need visual context for. The tool searches the transcript semantically and extracts frames at matching moments.
+```
+video_path: "/path/to/video.mp4" (or use url instead)
+url: "https://youtube.com/watch?v=xxx" (downloads video automatically)
+query: "connecting Gmail to the agent" (what you need visual context for)
+top_k: 10 (optional, number of transcript matches)
+context_words: 40 (optional, words of context per match)
+max_frames: 30 (optional)
+model_size: "tiny" (optional)
+clear: false (optional, removes all previous frames for this video before extracting)
+```
+
+**Auto mode:** Autonomously detects visual moments (UI actions, demonstrations, spatial references). Opt-in only.
 ```
 video_path: "/path/to/video.mp4"
-model_size: "tiny" (optional, default)
-visual_threshold: 0.4 (optional, 0.0-1.0. Lower = more frames. Default: 0.4)
-max_frames: 30 (optional, cap on total frames)
-output_dir: "~/Desktop/visual/title/" (optional, auto-generated)
+auto: true
 ```
-Returns `{video_path, output_dir, frame_count, analyzed_segments, visual_segments, skipped_segments, video_duration, frames: [{path, timestamp, timestamp_formatted, visual_score, transcript, reason}], hint}`
 
-**How it works:** Transcribes the video (reuses cache), then scores each segment for visual necessity using pattern matching (UI keywords, spatial references, demonstration language) + semantic similarity (embedding comparison to visual/non-visual anchor concepts). Only extracts frames at timestamps where the speaker is describing something visual.
+**Manual mode:** Extract frames at specific timestamps.
+```
+video_path: "/path/to/video.mp4"
+timestamps: [120, 185, 240] (seconds)
+```
 
-**Pipeline:** Use with clip_export to get visual context for specific moments:
-1. `clip_export(url="...", start=120, end=180)` returns `clip_path`
-2. `visual(video_path=<clip_path>)` extracts frames at visually relevant moments
-3. Read individual frame PNGs with the Read tool to see them
+**Clear mode:** Remove all frames and visual context .md for a video.
+```
+video_path: "/path/to/video.mp4"
+clear: true
+```
+Can combine with query/auto to clear and re-extract in one call.
+
+Returns `{video_path, mode, frame_count, analyzed_segments, video_duration, frames_dir, md_path, frames: [{path, filename, timestamp, timestamp_formatted, score, reason, transcript}]}`
+
+**Storage:** Frame PNGs are saved directly into the Obsidian vault (`External Files/visual/<title>/`). The visual context `.md` is saved to Desktop and hard-linked into the vault by augent-obsidian. Frame embeds use `![[filename.png]]` Obsidian wikilink syntax. Vault path is auto-detected from Obsidian's config.
+
+**Pipeline:** Use after `take_notes` when the user needs visual context the transcript didn't capture:
+1. `take_notes(url="...")` transcribes and creates notes (response includes `visual_hint`)
+2. User reads notes, identifies gaps: "I don't understand how he connected Gmail to the agent"
+3. `visual(url="...", query="connecting Gmail to the agent")` extracts frames at those moments
+4. Read frame PNGs with the Read tool to see the visual context
 
 ### identify_speakers
 Identify who speaks when in audio using pyannote speaker diarization. No API keys or tokens required.
