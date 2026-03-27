@@ -131,7 +131,7 @@ augent/
 ├── tts.py          # Text-to-speech (Kokoro)
 ├── memory.py       # Three-layer memory (SQLite)
 ├── graph.py        # Obsidian graph view (wikilinks, MOCs, frontmatter)
-├── clips.py        # Clip extraction for CLI (audio segments around keyword matches)
+├── clips.py        # CLI clip extraction (audio segments around matches)
 ├── export.py       # Export formats (JSON, CSV, SRT, VTT, MD)
 ├── cli.py          # CLI interface
 └── web.py          # Web UI (FastAPI)
