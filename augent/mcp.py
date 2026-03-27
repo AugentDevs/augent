@@ -2848,7 +2848,7 @@ def _score_visual_necessity(segments: list, segment_embeddings=None) -> list:
     semantic_scores = None
     if segment_embeddings is not None and len(segment_embeddings) > 0:
         try:
-            from .embeddings import _get_embedding_model_cache, _cosine_similarity
+            from .embeddings import _cosine_similarity, _get_embedding_model_cache
 
             model = _get_embedding_model_cache().get()
             visual_embs = model.encode(VISUAL_ANCHORS, convert_to_numpy=True, show_progress_bar=False)
@@ -3177,7 +3177,7 @@ def handle_visual(arguments: dict) -> dict:
 
     # Extract frames
     frame_info = []
-    for frame_num, (ts, score, reason, context) in enumerate(targets):
+    for _frame_num, (ts, score, reason, context) in enumerate(targets):
         # Unique filename: videoname_07m19s.png
         m, s = divmod(int(ts), 60)
         fname = f"{name_prefix}_{m:02d}m{s:02d}s.png"
