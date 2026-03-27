@@ -78,7 +78,7 @@ class TestToolsList:
     def test_returns_20_tools(self):
         resp = capture_stdout(handle_tools_list, 1)
         tools = resp["result"]["tools"]
-        assert len(tools) == 20
+        assert len(tools) == 21
 
     def test_all_tools_have_required_fields(self):
         resp = capture_stdout(handle_tools_list, 1)
@@ -112,6 +112,7 @@ class TestToolsList:
             "highlights",
             "tag",
             "rebuild_graph",
+            "visual",
         }
         assert names == expected
 
@@ -127,7 +128,7 @@ class TestToolsList:
             names = {t["name"] for t in resp["result"]["tools"]}
             assert "tag" not in names
             assert "clear_memory" not in names
-            assert len(resp["result"]["tools"]) == 18
+            assert len(resp["result"]["tools"]) == 19
         finally:
             config_mod._config = original
 
