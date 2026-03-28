@@ -929,7 +929,7 @@ _ALL_TOOLS = [
     },
     {
         "name": "visual",
-        "description": "Extract visual context from a video at moments that matter. Three modes: (1) Query mode (default): describe what you need visual context for and the tool finds those moments in the transcript, then extracts frames. (2) Auto mode: autonomously detects moments where the speaker implies visual content (UI actions, screen recordings, demonstrations). (3) Manual mode: extract frames at specific timestamps. Frames are stored in augent memory alongside the transcription and embedded in the .md file as Obsidian wikilinks.",
+        "description": "Extract visual context from a video at moments that matter. Four modes: (1) Query mode (default): describe what you need visual context for and the tool finds those moments in the transcript, then extracts frames. (2) Auto mode: autonomously detects moments where the speaker implies visual content (UI actions, screen recordings, demonstrations). (3) Manual mode: extract frames at specific timestamps. (4) Assist mode: analyzes the transcript for visual gaps and returns time ranges where the user should provide their own screenshots (ideal for talking-head videos where the speaker describes a UI but doesn't show it). Frames are stored in augent memory alongside the transcription and embedded in the .md file as Obsidian wikilinks.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -953,6 +953,10 @@ _ALL_TOOLS = [
                 "auto": {
                     "type": "boolean",
                     "description": "Auto mode: autonomously detect visual moments from transcript (UI actions, demonstrations, spatial references). Default: false. Ignored if query or timestamps are provided.",
+                },
+                "assist": {
+                    "type": "boolean",
+                    "description": "Assist mode: analyze the transcript for visual gaps and return time ranges where the user should provide their own screenshots. Ideal for talking-head videos or podcasts where the speaker describes a workflow or UI but the video doesn't show it. No frames are extracted — instead, returns structured gaps with time windows, transcript excerpts, and what kind of screenshot would help. Default: false.",
                 },
                 "model_size": {
                     "type": "string",
@@ -3292,6 +3296,7 @@ def handle_visual(arguments: dict) -> dict:
     query = arguments.get("query")
     timestamps = arguments.get("timestamps")
     auto_mode = arguments.get("auto", False)
+    assist_mode = arguments.get("assist", False)
     clear = arguments.get("clear", False)
     model_size = arguments.get("model_size", cfg.get("model_size", "tiny"))
     max_frames = int(
@@ -3351,10 +3356,13 @@ def handle_visual(arguments: dict) -> dict:
         mode = "query"
     elif auto_mode:
         mode = "auto"
+    elif assist_mode:
+        mode = "assist"
     else:
         raise ValueError(
             "Provide one of: query (describe what you need visual context for), "
-            "timestamps (list of seconds), or auto: true (autonomous detection)."
+            "timestamps (list of seconds), auto: true (autonomous detection), "
+            "or assist: true (flag visual gaps for manual screenshots)."
         )
 
     # Probe video duration
@@ -3486,6 +3494,113 @@ def handle_visual(arguments: dict) -> dict:
             for j in range(max(0, idx - 1), min(len(segments), idx + 2)):
                 parts.append(segments[j].get("text", "").strip())
             targets.append((ts, score, reason, " ".join(parts)))
+
+    elif mode == "assist":
+        # Assist mode: detect visual gaps and cluster into time ranges.
+        # Uses the same scoring pipeline as auto mode but returns gap
+        # analysis instead of extracting frames.
+        segment_embeddings = None
+        try:
+            segment_embeddings = _get_or_compute_embeddings(segments, audio_hash)
+        except Exception:
+            pass
+
+        scored = _score_visual_necessity(segments, segment_embeddings)
+
+        # Filter to qualifying segments (score >= 0.4)
+        qualifying = [
+            (idx, score, reason) for idx, score, reason in scored if score >= 0.4
+        ]
+        qualifying.sort(key=lambda x: segments[x[0]].get("start", 0))
+
+        # Cluster consecutive qualifying segments into time ranges.
+        # Segments within 15 seconds of each other merge into one gap.
+        gaps = []
+        for idx, score, reason in qualifying:
+            seg = segments[idx]
+            seg_start = seg.get("start", 0)
+            seg_end = seg.get("end", seg_start + 3.0)
+
+            if gaps and seg_start - gaps[-1]["end"] <= 15.0:
+                # Extend current gap
+                gap = gaps[-1]
+                gap["end"] = seg_end
+                gap["segments"].append(idx)
+                gap["peak_score"] = max(gap["peak_score"], score)
+                # Collect all unique reasons
+                if reason and reason not in gap["reasons"]:
+                    gap["reasons"].append(reason)
+            else:
+                # Start new gap
+                gaps.append({
+                    "start": seg_start,
+                    "end": seg_end,
+                    "segments": [idx],
+                    "peak_score": score,
+                    "reasons": [reason] if reason else [],
+                })
+
+        # Build structured output for each gap
+        visual_gaps = []
+        for i, gap in enumerate(gaps):
+            # Collect transcript text across all segments in this gap
+            transcript_parts = []
+            for seg_idx in gap["segments"]:
+                text = segments[seg_idx].get("text", "").strip()
+                if text:
+                    transcript_parts.append(text)
+            transcript = " ".join(transcript_parts)
+
+            # Generate a descriptive label from the reasons
+            reasons = gap["reasons"]
+            if any(r in ("UI action", "spatial UI action", "navigation action") for r in reasons):
+                screenshot_type = "UI interaction or navigation being described"
+            elif any(r in ("data visualization",) for r in reasons):
+                screenshot_type = "dashboard, chart, or data view being referenced"
+            elif any(r in ("code/terminal output", "command input") for r in reasons):
+                screenshot_type = "code, terminal, or command output being described"
+            elif any(r in ("step-by-step instruction",) for r in reasons):
+                screenshot_type = "step-by-step process being walked through"
+            elif any(r in ("demonstration", "screen recording") for r in reasons):
+                screenshot_type = "workflow or demonstration being shown"
+            elif any(r in ("explicit visual reference", "on-screen reference", "visual demonstration") for r in reasons):
+                screenshot_type = "specific screen or visual the speaker is referencing"
+            elif any(r in ("deictic reference", "spatial position") for r in reasons):
+                screenshot_type = "specific UI element or area being pointed to"
+            elif any("semantic" in r for r in reasons):
+                screenshot_type = "visual context implied by the discussion"
+            else:
+                screenshot_type = "visual context for what the speaker is describing"
+
+            visual_gaps.append({
+                "gap_number": i + 1,
+                "start": round(gap["start"], 1),
+                "end": round(gap["end"], 1),
+                "start_formatted": _fmt_ts(gap["start"]),
+                "end_formatted": _fmt_ts(gap["end"]),
+                "duration_seconds": round(gap["end"] - gap["start"], 1),
+                "peak_score": round(gap["peak_score"], 2),
+                "screenshot_type": screenshot_type,
+                "reasons": reasons,
+                "transcript": transcript[:500],
+            })
+
+        return {
+            "video_path": video_path,
+            "mode": "assist",
+            "gap_count": len(visual_gaps),
+            "analyzed_segments": len(segments),
+            "video_duration": round(video_duration, 1),
+            "video_duration_formatted": _fmt_ts(video_duration),
+            "gaps": visual_gaps,
+            "hint": (
+                "These are moments where the speaker describes something visual "
+                "but the video may not show it. For better results replicating "
+                "their workflow, provide your own screenshots for these time ranges. "
+                "Once you have screenshots, use visual() with timestamps to place them, "
+                "or drop them directly into the Obsidian vault."
+            ),
+        }
 
     # Clamp timestamps to video bounds
     targets = [

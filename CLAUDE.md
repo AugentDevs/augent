@@ -261,7 +261,7 @@ Returns `{success, migration: {migrated, synced, recreated, errors}, related_lin
 **When to use:** Run once after upgrading to add Obsidian graph view support to existing memory. Also useful after bulk imports or manual tag changes. The user should point Obsidian at the `memory_dir` path as a vault.
 
 ### visual
-Extract visual context from a video at moments that matter. Three modes:
+Extract visual context from a video at moments that matter. Four modes:
 
 **Query mode (default, recommended):** Describe what you need visual context for. The tool searches the transcript semantically and extracts frames at matching moments.
 ```
@@ -286,6 +286,15 @@ auto: true
 video_path: "/path/to/video.mp4"
 timestamps: [120, 185, 240] (seconds)
 ```
+
+**Assist mode:** Analyze the transcript for visual gaps and return time ranges where the user should provide their own screenshots. Ideal for talking-head videos or podcasts where the speaker describes a workflow but the video doesn't show it. No frames are extracted.
+```
+video_path: "/path/to/video.mp4"
+assist: true
+```
+Returns `{video_path, mode, gap_count, analyzed_segments, video_duration, gaps: [{gap_number, start, end, start_formatted, end_formatted, duration_seconds, peak_score, screenshot_type, reasons, transcript}]}`
+
+Each gap includes a `screenshot_type` label describing what kind of screenshot would help (e.g., "UI interaction or navigation being described", "dashboard, chart, or data view being referenced"). The user takes those screenshots and can then use manual mode with timestamps to place them.
 
 **Clear mode:** Remove all frames and visual context .md for a video.
 ```
