@@ -3532,13 +3532,15 @@ def handle_visual(arguments: dict) -> dict:
                     gap["reasons"].append(reason)
             else:
                 # Start new gap
-                gaps.append({
-                    "start": seg_start,
-                    "end": seg_end,
-                    "segments": [idx],
-                    "peak_score": score,
-                    "reasons": [reason] if reason else [],
-                })
+                gaps.append(
+                    {
+                        "start": seg_start,
+                        "end": seg_end,
+                        "segments": [idx],
+                        "peak_score": score,
+                        "reasons": [reason] if reason else [],
+                    }
+                )
 
         # Build structured output for each gap
         visual_gaps = []
@@ -3553,7 +3555,10 @@ def handle_visual(arguments: dict) -> dict:
 
             # Generate a descriptive label from the reasons
             reasons = gap["reasons"]
-            if any(r in ("UI action", "spatial UI action", "navigation action") for r in reasons):
+            if any(
+                r in ("UI action", "spatial UI action", "navigation action")
+                for r in reasons
+            ):
                 screenshot_type = "UI interaction or navigation being described"
             elif any(r in ("data visualization",) for r in reasons):
                 screenshot_type = "dashboard, chart, or data view being referenced"
@@ -3563,7 +3568,15 @@ def handle_visual(arguments: dict) -> dict:
                 screenshot_type = "step-by-step process being walked through"
             elif any(r in ("demonstration", "screen recording") for r in reasons):
                 screenshot_type = "workflow or demonstration being shown"
-            elif any(r in ("explicit visual reference", "on-screen reference", "visual demonstration") for r in reasons):
+            elif any(
+                r
+                in (
+                    "explicit visual reference",
+                    "on-screen reference",
+                    "visual demonstration",
+                )
+                for r in reasons
+            ):
                 screenshot_type = "specific screen or visual the speaker is referencing"
             elif any(r in ("deictic reference", "spatial position") for r in reasons):
                 screenshot_type = "specific UI element or area being pointed to"
@@ -3572,18 +3585,20 @@ def handle_visual(arguments: dict) -> dict:
             else:
                 screenshot_type = "visual context for what the speaker is describing"
 
-            visual_gaps.append({
-                "gap_number": i + 1,
-                "start": round(gap["start"], 1),
-                "end": round(gap["end"], 1),
-                "start_formatted": _fmt_ts(gap["start"]),
-                "end_formatted": _fmt_ts(gap["end"]),
-                "duration_seconds": round(gap["end"] - gap["start"], 1),
-                "peak_score": round(gap["peak_score"], 2),
-                "screenshot_type": screenshot_type,
-                "reasons": reasons,
-                "transcript": transcript[:500],
-            })
+            visual_gaps.append(
+                {
+                    "gap_number": i + 1,
+                    "start": round(gap["start"], 1),
+                    "end": round(gap["end"], 1),
+                    "start_formatted": _fmt_ts(gap["start"]),
+                    "end_formatted": _fmt_ts(gap["end"]),
+                    "duration_seconds": round(gap["end"] - gap["start"], 1),
+                    "peak_score": round(gap["peak_score"], 2),
+                    "screenshot_type": screenshot_type,
+                    "reasons": reasons,
+                    "transcript": transcript[:500],
+                }
+            )
 
         return {
             "video_path": video_path,
