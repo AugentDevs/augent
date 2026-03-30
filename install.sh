@@ -808,6 +808,22 @@ configure_mcp() {
         claude mcp remove augent -s user >/dev/null 2>&1 || true
         claude mcp add augent -s user -- "$python_abs" -m augent.mcp >/dev/null 2>&1
         log_success "Claude Code MCP configured"
+
+        # Add global instruction so Claude routes URLs through augent, not WebFetch
+        local claude_md="$HOME/.claude/CLAUDE.md"
+        local augent_block="## URL Handling — Augent Pipeline
+
+When a user pastes ANY URL (tweets, YouTube, TikTok, Twitter/X, podcasts, SoundCloud, or any link that might contain audio or video) and asks what was said, what happened, what's in it, or anything about the content — ALWAYS use the augent MCP tools: \`download_audio\` to download, then \`transcribe_audio\` to get the text. Do NOT use WebFetch for media URLs. Do NOT try Nitter or other web scrapers. The augent pipeline handles Twitter, YouTube, and 1000+ sites directly."
+
+        if [[ -f "$claude_md" ]]; then
+            if ! grep -q "Augent Pipeline" "$claude_md" 2>/dev/null; then
+                printf "\n\n%s\n" "$augent_block" >> "$claude_md"
+            fi
+        else
+            ensure_dir "$HOME/.claude"
+            printf "# Global Instructions\n\n%s\n" "$augent_block" > "$claude_md"
+        fi
+        log_success "Claude Code global instructions configured"
     else
         log_warn "Claude Code not found — install it, then run:"
         log_info "  claude mcp add augent -s user -- $python_abs -m augent.mcp"
