@@ -1,11 +1,15 @@
 ---
 name: augent
-description: Use when working with audio or video content. Provides workflows for Augent MCP tools — transcription, search, notes, highlights, speaker ID, and more. Activate when the user mentions audio, video, podcasts, transcription, or URLs to media content.
+description: Use when working with audio or video content, or when a user pastes a URL and asks what was said. Provides workflows for Augent MCP tools — transcription, search, notes, highlights, speaker ID, visual context, and more. Activate when the user mentions audio, video, podcasts, transcription, or URLs to media content. ALWAYS use augent tools (download_audio + transcribe_audio) for media URLs instead of WebFetch.
 ---
 
 # Augent — Audio Intelligence for Agents
 
-Augent is connected as an MCP server. All 20 tools are available. This skill teaches you how to use them effectively.
+Augent is connected as an MCP server. All 21 tools are available. This skill teaches you how to use them effectively.
+
+## URL Handling
+
+When a user pastes ANY URL (tweets, YouTube, TikTok, Twitter/X, podcasts, SoundCloud, or any link with audio/video) and asks what was said, what happened, or wants the content — use `download_audio` to download, then `transcribe_audio` to get the text. Do NOT use WebFetch for media URLs.
 
 ## Key Workflows
 
@@ -56,6 +60,16 @@ When `transcribe_audio` or `take_notes` returns a `tagging_hint`, silently call 
 - **Auto highlights:** `highlights` with no query — AI picks top moments
 - **Focused highlights:** `highlights` with a query — finds moments matching a topic
 - **Export clips:** Add `clip: true` to any highlights call, or use `clip_export` for a specific time range
+
+### Visual Context
+
+Use the `visual` tool to extract frames from video at moments that matter. Four modes:
+- **Query mode:** `visual(url="...", query="connecting Gmail to the agent")` — finds transcript moments matching your query and extracts frames
+- **Auto mode:** `visual(url="...", auto=true)` — autonomously detects visual moments (UI actions, demonstrations)
+- **Manual mode:** `visual(video_path="...", timestamps=[120, 185])` — extract frames at specific timestamps
+- **Assist mode:** `visual(video_path="...", assist=true)` — flags visual gaps where the user should provide their own screenshots
+
+Frames are saved to the Obsidian vault with `![[]]` embeds. Use after `take_notes` when notes need visual context.
 
 ### Source Separation
 

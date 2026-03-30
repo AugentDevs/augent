@@ -1,6 +1,6 @@
 ---
 name: augent
-description: Audio intelligence toolkit. Transcribe, search by keyword or meaning, take notes, detect chapters, identify speakers, separate audio, export clips, tag, highlights, and text-to-speech — all local, all private. 20 MCP tools for audio.
+description: Audio intelligence toolkit. Transcribe, search by keyword or meaning, take notes, detect chapters, identify speakers, separate audio, export clips, tag, highlights, visual context, and text-to-speech — all local, all private. 21 MCP tools for audio and video.
 homepage: https://github.com/AugentDevs/Augent
 metadata: {"openclaw":{"emoji":"🎙","os":["darwin","linux","win32"],"requires":{"bins":["augent-mcp","ffmpeg"]},"install":[{"id":"uv","kind":"uv","package":"augent","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (uv)"},{"id":"pip","kind":"pip","package":"augent[all]","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (pip)"}]}}
 ---
@@ -64,7 +64,7 @@ pip install "augent[all]"
 
 ## Tools
 
-Augent exposes 20 MCP tools:
+Augent exposes 21 MCP tools:
 
 ### Core
 
@@ -99,6 +99,7 @@ Augent exposes 20 MCP tools:
 | `clear_memory` | Clear the transcription memory to free disk space. |
 | `tag` | Add, remove, or list tags on transcriptions. Broad topic categories for organizing memories. |
 | `highlights` | Export the best moments from a transcription. Auto mode picks top moments; focused mode finds moments matching a topic. |
+| `visual` | Extract visual context from video at moments that matter. Query, auto, manual, and assist modes. Frames saved to Obsidian vault. |
 | `rebuild_graph` | Rebuild Obsidian graph view data for all transcriptions. Migrates files, computes wikilinks, generates MOC hubs. |
 
 ## Usage Examples

@@ -824,6 +824,23 @@ When a user pastes ANY URL (tweets, YouTube, TikTok, Twitter/X, podcasts, SoundC
             printf "# Global Instructions\n\n%s\n" "$augent_block" > "$claude_md"
         fi
         log_success "Claude Code global instructions configured"
+
+        # Install Claude Code skill
+        local skill_dir="$HOME/.claude/skills/augent"
+        ensure_dir "$skill_dir"
+
+        local script_dir=""
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" 2>/dev/null && pwd 2>/dev/null)" || true
+
+        if [[ -n "$script_dir" ]] && [[ -f "$script_dir/skills/augent/SKILL.md" ]]; then
+            cp "$script_dir/skills/augent/SKILL.md" "$skill_dir/SKILL.md"
+        else
+            curl -fsSL "https://raw.githubusercontent.com/$AUGENT_REPO/main/skills/augent/SKILL.md" \
+                -o "$skill_dir/SKILL.md" 2>/dev/null || true
+        fi
+        if [[ -f "$skill_dir/SKILL.md" ]]; then
+            log_success "Claude Code skill installed"
+        fi
     else
         log_warn "Claude Code not found — install it, then run:"
         log_info "  claude mcp add augent -s user -- $python_abs -m augent.mcp"

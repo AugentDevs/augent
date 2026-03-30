@@ -501,14 +501,14 @@ def _write_skill_md(dest: Path, mcp_cmd: Optional[str], python_abs: str):
 
     content = f"""---
 name: augent
-description: Audio intelligence toolkit. Transcribe, search, take notes, detect chapters, identify speakers, separate audio, export clips, tag, highlights, and text-to-speech — all local, all private. 20 MCP tools for audio.
+description: Audio intelligence toolkit. Transcribe, search, take notes, detect chapters, identify speakers, separate audio, export clips, tag, highlights, visual context, and text-to-speech — all local, all private. 21 MCP tools for audio and video.
 homepage: https://github.com/AugentDevs/Augent
 metadata: {{"openclaw":{{"emoji":"🎙","os":["darwin","linux","win32"],"requires":{{"bins":["augent-mcp","ffmpeg"]}},"install":[{{"id":"uv","kind":"uv","package":"augent","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (uv)"}},{{"id":"pip","kind":"pip","package":"augent[all]","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (pip)"}}]}}}}
 ---
 
 # Augent — Audio Intelligence for AI Agents
 
-20 MCP tools for audio: transcribe, search, take notes, identify speakers, detect chapters, separate audio, export clips, tag, highlights, and text-to-speech. Fully local, fully private.
+21 MCP tools for audio and video: transcribe, search, take notes, identify speakers, detect chapters, separate audio, export clips, tag, highlights, visual context, and text-to-speech. Fully local, fully private.
 
 ## Config
 
