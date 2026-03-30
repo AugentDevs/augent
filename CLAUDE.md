@@ -34,7 +34,9 @@ augent search ~/Downloads/tutorial.webm "keyword1,keyword2"
 
 ## Note-Taking (Primary Workflow)
 
-**IMPORTANT:** When a user gives you a video/audio URL and asks to create notes, a quiz, take notes, transcribe, or anything involving audio content — ALWAYS use the `take_notes` MCP tool. Do NOT fetch the URL directly. Do NOT use WebFetch. The `take_notes` tool downloads the audio, transcribes it locally, and returns the content for formatting.
+**IMPORTANT:** When a user gives you ANY URL and asks what was said, what happened, what's in it, or anything about the content — ALWAYS use the augent pipeline (download_audio + transcribe_audio, or take_notes for notes). This includes tweets, YouTube links, podcast URLs, TikTok, Twitter/X posts, and any link that might contain audio or video. Do NOT use WebFetch for media URLs. Do NOT say "augent can't do that" for social media links. If the URL might have audio or video, download it first and find out.
+
+For note-taking specifically (notes, quiz, summary, highlights) — use the `take_notes` MCP tool. It downloads, transcribes, and saves .md to Desktop in one call.
 
 When a user asks to "take notes" or "create a quiz" from a URL, use the `take_notes` tool. One tool call does everything:
 

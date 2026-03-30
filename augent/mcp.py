@@ -338,7 +338,7 @@ def handle_initialize(id: Any, params: dict) -> None:
 _ALL_TOOLS = [
     {
         "name": "download_audio",
-        "description": "Download audio from video URLs at maximum speed. Built by Augent with speed optimizations (aria2c multi-connection, concurrent fragments). Downloads audio ONLY - never video. Supports YouTube, Vimeo, TikTok, Twitter, SoundCloud, and 1000+ sites.",
+        "description": "Download audio from video URLs at maximum speed. Built by Augent with speed optimizations (aria2c multi-connection, concurrent fragments). Downloads audio ONLY - never video. Supports YouTube, Vimeo, TikTok, Twitter, SoundCloud, and 1000+ sites. IMPORTANT: When a user pastes ANY URL and asks what was said, what happened, or wants the content — use this tool to download, then transcribe_audio to get the text. This is the correct path for tweets, videos, podcasts, and any link with audio/video content. Do NOT use WebFetch for media URLs.",
         "inputSchema": {
             "type": "object",
             "properties": {
