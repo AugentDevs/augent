@@ -1,13 +1,13 @@
 ---
 name: augent
-description: Audio intelligence toolkit. Transcribe, search by keyword or meaning, take notes, detect chapters, identify speakers, separate audio, export clips, tag, highlights, visual context, and text-to-speech — all local, all private. 21 MCP tools for audio and video.
+description: Audio intelligence toolkit for AI agents. 22 local MCP tools to download audio/video from 1000+ sites, transcribe in 99 languages, search by keyword or meaning, take notes, detect chapters, identify speakers, separate audio, export clips, tag, extract visual frames, generate speech, and build persistent searchable memory — with network access for media downloads and local filesystem access for transcription storage. All local, all private.
 homepage: https://github.com/AugentDevs/Augent
 metadata: {"openclaw":{"emoji":"🎙","os":["darwin","linux","win32"],"requires":{"bins":["augent-mcp","ffmpeg"]},"install":[{"id":"uv","kind":"uv","package":"augent","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (uv)"},{"id":"pip","kind":"pip","package":"augent[all]","bins":["augent-mcp","augent","augent-web"],"label":"Install augent (pip)"}]}}
 ---
 
-# Augent — Audio Intelligence for AI Agents
+# Augent — Audio & Video Intelligence for AI Agents
 
-Augent is an MCP server that gives your agent all audio intelligence tools. Transcribe, search, take notes, identify speakers, detect chapters, separate audio, export clips, and generate speech — fully local, fully private.
+Augent is an MCP server that gives your agent 22 tools for audio and video intelligence. Download from 1000+ sites, transcribe in 99 languages, search by keyword or meaning, take notes, identify speakers, detect chapters, separate audio, export clips, extract visual frames, record X/Twitter Spaces, and generate speech. All processing runs locally on your machine. Network access is used only for downloading media from URLs. Filesystem access is used for storing transcriptions, notes, and clips locally.
 
 ## Config
 
@@ -36,13 +36,7 @@ If `augent-mcp` is not in PATH, use the full Python module path:
 
 ## Install
 
-**One-liner (recommended):** Installs augent, FFmpeg, yt-dlp, aria2, and configures MCP automatically.
-
-```bash
-curl -fsSL https://augent.app/install.sh | bash
-```
-
-**Via uv:**
+**Via uv (recommended):**
 
 ```bash
 uv tool install augent
@@ -62,9 +56,17 @@ pip install "augent[all]"
 
 **System dependencies:** FFmpeg is required. Install with `brew install ffmpeg` (macOS) or `apt install ffmpeg` (Linux). For fast audio downloads, also install yt-dlp and aria2.
 
+**Alternative:** A one-liner that installs augent, FFmpeg, yt-dlp, aria2, and configures MCP automatically:
+
+```bash
+curl -fsSL https://augent.app/install.sh | bash
+```
+
+Source: [install.sh on GitHub](https://github.com/AugentDevs/Augent/blob/main/install.sh)
+
 ## Tools
 
-Augent exposes 21 MCP tools:
+Augent exposes 22 MCP tools:
 
 ### Core
 
@@ -101,6 +103,7 @@ Augent exposes 21 MCP tools:
 | `highlights` | Export the best moments from a transcription. Auto mode picks top moments; focused mode finds moments matching a topic. |
 | `visual` | Extract visual context from video at moments that matter. Query, auto, manual, and assist modes. Frames saved to Obsidian vault. |
 | `rebuild_graph` | Rebuild Obsidian graph view data for all transcriptions. Migrates files, computes wikilinks, generates MOC hubs. |
+| `spaces` | Download or live-record X/Twitter Spaces. Start, check status, or stop recordings. |
 
 ## Usage Examples
 

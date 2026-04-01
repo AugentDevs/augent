@@ -121,7 +121,7 @@ graph TB
 
 ```
 augent/
-├── mcp.py          # MCP server — 21 tools for agents
+├── mcp.py          # MCP server — 22 tools for agents
 ├── config.py       # User configuration (~/.augent/config.yaml)
 ├── core.py         # Transcription engine (faster-whisper)
 ├── search.py       # Keyword search

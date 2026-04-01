@@ -5,7 +5,7 @@ description: Use when working with audio or video content, or when a user pastes
 
 # Augent — Audio Intelligence for Agents
 
-Augent is connected as an MCP server. All 21 tools are available. This skill teaches you how to use them effectively.
+Augent is connected as an MCP server. All 22 tools are available. This skill teaches you how to use them effectively.
 
 ## URL Handling
 
