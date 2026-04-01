@@ -67,7 +67,7 @@ class TestSpacesToolsList:
 class TestURLNormalization:
     def test_x_to_twitter(self):
         result = _normalize_twitter_space_url("https://x.com/i/spaces/abc")
-        assert result.startswith("https://twitter.com/")
+        assert result == "https://twitter.com/i/spaces/abc"
 
     def test_strips_peek(self):
         url = _normalize_twitter_space_url("https://x.com/i/spaces/abc/peek")
