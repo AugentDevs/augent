@@ -325,17 +325,16 @@ num_speakers: null (optional, auto-detect if omitted)
 Returns `{speakers: [...], segments: [{speaker, start, end, text, timestamp}], duration, language}`
 
 ### spaces
-Download or live-record a Twitter/X Space. Auto-detects live vs ended. Starts in the background and returns instantly with a `recording_id`. Requires one-time setup of `~/.augent/auth.json` with Twitter `auth_token` and `ct0` cookies.
+Download, check, or stop X/Twitter Spaces recordings. One tool, three modes based on parameters. Requires one-time setup of `~/.augent/auth.json` with Twitter `auth_token` and `ct0` cookies.
+
+**Start download** (pass `url`):
 ```
 url: "https://x.com/i/spaces/1yNxaNvaMYQKj"
 output_dir: "~/Downloads" (optional, default)
 ```
 Returns `{success, recording_id, mode, title, url, output_dir, pid, message}`
 
-**Workflow:** `spaces` starts the download, then use `spaces_check` to poll status. When complete, pipe the audio through `transcribe_audio`, `search_audio`, `deep_search`, etc.
-
-### spaces_check
-Check the status of a Twitter Space download.
+**Check status** (pass `recording_id`):
 ```
 recording_id: "abc12345"
 ```
@@ -343,12 +342,14 @@ Returns `{recording_id, status, elapsed_seconds, elapsed_formatted, file: {path,
 
 Status values: `downloading`, `complete`, `error`.
 
-### spaces_stop
-Stop a live Twitter Space recording. Kills the download process and saves whatever has been captured so far.
+**Stop recording** (pass `recording_id` + `stop`):
 ```
 recording_id: "abc12345"
+stop: true
 ```
 Returns `{success, recording_id, status, elapsed_seconds, elapsed_formatted, file, message}`
+
+**Workflow:** `spaces(url=...)` starts the download, then `spaces(recording_id=...)` to poll status. When complete, pipe the audio through `transcribe_audio`, `search_audio`, `deep_search`, etc.
 
 ### list_files
 List media files in a directory.

@@ -1,7 +1,7 @@
 """
-Tests for the spaces MCP tools.
+Tests for the spaces MCP tool.
 
-Tests tool definitions, routing, input validation, cookie auth,
+Tests tool definition, routing, input validation, cookie auth,
 URL normalization, and handler behavior (mocked subprocesses).
 """
 
@@ -17,12 +17,12 @@ from augent.mcp import (
     _active_recordings,
     _get_twitter_cookies_path,
     _normalize_twitter_space_url,
+    _spaces_check,
+    _spaces_download,
+    _spaces_stop,
     handle_spaces,
-    handle_spaces_check,
-    handle_spaces_stop,
     handle_tools_call,
     handle_tools_list,
-    send_response,
 )
 
 
@@ -38,17 +38,17 @@ def capture_stdout(func, *args, **kwargs):
 
 
 class TestSpacesToolsList:
-    def test_returns_24_tools(self):
+    def test_returns_22_tools(self):
         resp = capture_stdout(handle_tools_list, 1)
         tools = resp["result"]["tools"]
-        assert len(tools) == 24
+        assert len(tools) == 22
 
-    def test_spaces_tools_registered(self):
+    def test_spaces_tool_registered(self):
         resp = capture_stdout(handle_tools_list, 1)
         names = {t["name"] for t in resp["result"]["tools"]}
         assert "spaces" in names
-        assert "spaces_check" in names
-        assert "spaces_stop" in names
+        assert "spaces_check" not in names
+        assert "spaces_stop" not in names
 
     def test_spaces_schema(self):
         resp = capture_stdout(handle_tools_list, 1)
@@ -56,17 +56,9 @@ class TestSpacesToolsList:
         props = tool["inputSchema"]["properties"]
         assert "url" in props
         assert "output_dir" in props
-        assert tool["inputSchema"]["required"] == ["url"]
-
-    def test_spaces_check_schema(self):
-        resp = capture_stdout(handle_tools_list, 1)
-        tool = next(t for t in resp["result"]["tools"] if t["name"] == "spaces_check")
-        assert tool["inputSchema"]["required"] == ["recording_id"]
-
-    def test_spaces_stop_schema(self):
-        resp = capture_stdout(handle_tools_list, 1)
-        tool = next(t for t in resp["result"]["tools"] if t["name"] == "spaces_stop")
-        assert tool["inputSchema"]["required"] == ["recording_id"]
+        assert "recording_id" in props
+        assert "stop" in props
+        assert tool["inputSchema"]["required"] == []
 
 
 # --- URL normalization ---
@@ -107,23 +99,16 @@ class TestCookieAuth:
             with open(auth_path, "w") as f:
                 json.dump({"auth_token": "tok123", "ct0": "ct0val"}, f)
 
-            with mock.patch("os.path.expanduser", return_value=tmpdir):
-                with mock.patch("augent.mcp._get_twitter_cookies_path") as mock_fn:
-                    # Test the logic directly
-                    mock_fn.side_effect = lambda: None  # skip for direct test
-
-            # Test directly by mimicking the function logic
-            augent_dir = tmpdir
-            if os.path.exists(auth_path):
-                with open(auth_path) as f:
-                    auth = json.load(f)
-                lines = [
-                    "# Netscape HTTP Cookie File",
-                    f".twitter.com\tTRUE\t/\tTRUE\t0\tauth_token\t{auth['auth_token']}",
-                    f".twitter.com\tTRUE\t/\tTRUE\t0\tct0\t{auth['ct0']}",
-                ]
-                with open(cookies_path, "w") as f:
-                    f.write("\n".join(lines) + "\n")
+            # Verify the cookie generation logic
+            with open(auth_path) as f:
+                auth = json.load(f)
+            lines = [
+                "# Netscape HTTP Cookie File",
+                f".twitter.com\tTRUE\t/\tTRUE\t0\tauth_token\t{auth['auth_token']}",
+                f".twitter.com\tTRUE\t/\tTRUE\t0\tct0\t{auth['ct0']}",
+            ]
+            with open(cookies_path, "w") as f:
+                f.write("\n".join(lines) + "\n")
 
             assert os.path.exists(cookies_path)
             with open(cookies_path) as f:
@@ -133,41 +118,60 @@ class TestCookieAuth:
             assert "Netscape" in content
 
 
+# --- Routing within handle_spaces ---
+
+
+class TestSpacesRouting:
+    def test_url_routes_to_download(self):
+        with mock.patch("augent.mcp._spaces_download") as mock_fn:
+            mock_fn.return_value = {"success": True}
+            handle_spaces({"url": "https://x.com/i/spaces/abc"})
+            mock_fn.assert_called_once()
+
+    def test_recording_id_routes_to_check(self):
+        with mock.patch("augent.mcp._spaces_check") as mock_fn:
+            mock_fn.return_value = {"status": "downloading"}
+            handle_spaces({"recording_id": "abc123"})
+            mock_fn.assert_called_once()
+
+    def test_recording_id_stop_routes_to_stop(self):
+        with mock.patch("augent.mcp._spaces_stop") as mock_fn:
+            mock_fn.return_value = {"status": "stopped"}
+            handle_spaces({"recording_id": "abc123", "stop": True})
+            mock_fn.assert_called_once()
+
+    def test_no_params_raises(self):
+        with pytest.raises(ValueError, match="Provide either"):
+            handle_spaces({})
+
+
 # --- Input validation ---
 
 
 class TestSpacesValidation:
-    def test_missing_url_raises(self):
-        with pytest.raises(ValueError, match="Missing required parameter: url"):
+    def test_download_missing_url_raises(self):
+        with pytest.raises(ValueError, match="Provide either"):
             handle_spaces({})
 
-    def test_no_cookies_raises_setup_instructions(self):
+    def test_download_no_cookies_raises(self):
         with mock.patch("augent.mcp._get_twitter_cookies_path", return_value=None):
             with pytest.raises(FileNotFoundError, match="one-time setup"):
                 handle_spaces({"url": "https://x.com/i/spaces/abc"})
 
-    def test_check_missing_recording_id(self):
-        with pytest.raises(ValueError, match="Missing required parameter: recording_id"):
-            handle_spaces_check({})
-
     def test_check_unknown_recording_id(self):
         with pytest.raises(ValueError, match="No active download"):
-            handle_spaces_check({"recording_id": "nonexistent"})
-
-    def test_stop_missing_recording_id(self):
-        with pytest.raises(ValueError, match="Missing required parameter: recording_id"):
-            handle_spaces_stop({})
+            handle_spaces({"recording_id": "nonexistent"})
 
     def test_stop_unknown_recording_id(self):
         with pytest.raises(ValueError, match="No active download"):
-            handle_spaces_stop({"recording_id": "nonexistent"})
+            handle_spaces({"recording_id": "nonexistent", "stop": True})
 
 
-# --- Routing ---
+# --- MCP tool call routing ---
 
 
-class TestSpacesRouting:
-    def test_spaces_routes(self):
+class TestSpacesMCPRouting:
+    def test_spaces_routes_through_tools_call(self):
         with mock.patch("augent.mcp.handle_spaces") as mock_handler:
             mock_handler.return_value = {"success": True, "recording_id": "abc"}
             resp = capture_stdout(
@@ -178,30 +182,8 @@ class TestSpacesRouting:
             mock_handler.assert_called_once()
             assert "result" in resp
 
-    def test_spaces_check_routes(self):
-        with mock.patch("augent.mcp.handle_spaces_check") as mock_handler:
-            mock_handler.return_value = {"recording_id": "abc", "status": "complete"}
-            resp = capture_stdout(
-                handle_tools_call,
-                1,
-                {"name": "spaces_check", "arguments": {"recording_id": "abc"}},
-            )
-            mock_handler.assert_called_once()
-            assert "result" in resp
 
-    def test_spaces_stop_routes(self):
-        with mock.patch("augent.mcp.handle_spaces_stop") as mock_handler:
-            mock_handler.return_value = {"success": True, "status": "stopped"}
-            resp = capture_stdout(
-                handle_tools_call,
-                1,
-                {"name": "spaces_stop", "arguments": {"recording_id": "abc"}},
-            )
-            mock_handler.assert_called_once()
-            assert "result" in resp
-
-
-# --- Handler behavior (mocked subprocess) ---
+# --- Download handler ---
 
 
 class TestSpacesDownload:
@@ -214,7 +196,7 @@ class TestSpacesDownload:
             with mock.patch("subprocess.run", return_value=mock_meta):
                 with mock.patch("subprocess.Popen", return_value=mock_process):
                     with mock.patch("os.makedirs"):
-                        result = handle_spaces({
+                        result = _spaces_download({
                             "url": "https://x.com/i/spaces/abc",
                             "output_dir": "/tmp/test_spaces",
                         })
@@ -223,7 +205,6 @@ class TestSpacesDownload:
         assert result["mode"] == "recording"
         assert result["title"] == "Test Space"
         assert result["recording_id"] in _active_recordings
-        # Clean up
         del _active_recordings[result["recording_id"]]
 
     def test_live_space_starts_recording(self):
@@ -236,7 +217,7 @@ class TestSpacesDownload:
             with mock.patch("subprocess.run", side_effect=[mock_meta, mock_stream]):
                 with mock.patch("subprocess.Popen", return_value=mock_process):
                     with mock.patch("os.makedirs"):
-                        result = handle_spaces({
+                        result = _spaces_download({
                             "url": "https://x.com/i/spaces/abc",
                         })
 
@@ -253,7 +234,10 @@ class TestSpacesDownload:
             with mock.patch("subprocess.run", return_value=mock_meta):
                 with mock.patch("os.makedirs"):
                     with pytest.raises(RuntimeError, match="Failed to fetch space info"):
-                        handle_spaces({"url": "https://x.com/i/spaces/abc"})
+                        _spaces_download({"url": "https://x.com/i/spaces/abc"})
+
+
+# --- Check handler ---
 
 
 class TestSpacesCheck:
@@ -283,7 +267,7 @@ class TestSpacesCheck:
     def test_downloading_status(self):
         rid = self._setup_recording(poll_return=None)
         try:
-            result = handle_spaces_check({"recording_id": rid})
+            result = _spaces_check({"recording_id": rid})
             assert result["status"] == "downloading"
             assert result["elapsed_seconds"] >= 59
         finally:
@@ -296,7 +280,7 @@ class TestSpacesCheck:
 
         try:
             rid = self._setup_recording(poll_return=0, output_file=temp_path)
-            result = handle_spaces_check({"recording_id": rid})
+            result = _spaces_check({"recording_id": rid})
             assert result["status"] == "complete"
             assert result["file"]["path"] == temp_path
             assert rid not in _active_recordings
@@ -305,9 +289,12 @@ class TestSpacesCheck:
 
     def test_error_status(self):
         rid = self._setup_recording(poll_return=1)
-        result = handle_spaces_check({"recording_id": rid})
+        result = _spaces_check({"recording_id": rid})
         assert result["status"] == "error"
         assert rid not in _active_recordings
+
+
+# --- Stop handler ---
 
 
 class TestSpacesStop:
@@ -331,7 +318,7 @@ class TestSpacesStop:
             "output_file": None,
         }
 
-        result = handle_spaces_stop({"recording_id": rid})
+        result = _spaces_stop({"recording_id": rid})
         assert result["status"] == "stopped"
         assert result["success"] is True
         mock_process.send_signal.assert_called_once()
@@ -356,7 +343,7 @@ class TestSpacesStop:
             "output_file": None,
         }
 
-        result = handle_spaces_stop({"recording_id": rid})
+        result = _spaces_stop({"recording_id": rid})
         assert result["status"] == "stopped"
         mock_process.send_signal.assert_not_called()
         assert rid not in _active_recordings
@@ -366,7 +353,7 @@ class TestSpacesStop:
 
 
 class TestSpacesMCPErrors:
-    def test_missing_url_returns_mcp_error(self):
+    def test_no_params_returns_mcp_error(self):
         resp = capture_stdout(
             handle_tools_call,
             1,
@@ -388,6 +375,6 @@ class TestSpacesMCPErrors:
         resp = capture_stdout(
             handle_tools_call,
             1,
-            {"name": "spaces_check", "arguments": {"recording_id": "fake"}},
+            {"name": "spaces", "arguments": {"recording_id": "fake"}},
         )
         assert resp["error"]["code"] == -32602

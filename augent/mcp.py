@@ -26,9 +26,7 @@ Tools exposed:
 - tag: Add, remove, or list tags on transcriptions
 - rebuild_graph: Rebuild Obsidian graph view data for all transcriptions
 - visual: Extract visual context from video at moments that matter
-- spaces: Download or live-record X/Twitter Spaces audio
-- spaces_check: Check download/recording status
-- spaces_stop: Stop a live recording
+- spaces: Download, check, or stop X/Twitter Spaces recordings
 
 Usage:
   python -m augent.mcp
@@ -992,48 +990,28 @@ _ALL_TOOLS = [
     },
     {
         "name": "spaces",
-        "description": "Download a Twitter/X Space audio. Starts in the background and returns instantly with a recording_id. Use spaces_check to check progress, spaces_stop to cancel.",
+        "description": "Download or live-record a Twitter/X Space. Three modes: (1) Pass url to start a download (returns recording_id), (2) Pass recording_id to check status, (3) Pass recording_id + stop=true to stop a live recording.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "Twitter/X Space URL (e.g., https://x.com/i/spaces/1yNxaNvaMYQKj)",
+                    "description": "Twitter/X Space URL to download (e.g., https://x.com/i/spaces/1yNxaNvaMYQKj). Starts download in background.",
                 },
                 "output_dir": {
                     "type": "string",
                     "description": "Directory to save the audio file. Default: ~/Downloads",
                 },
-            },
-            "required": ["url"],
-        },
-    },
-    {
-        "name": "spaces_check",
-        "description": "Check the status of a Twitter Space download started by spaces. Returns whether it's still downloading, complete, or errored, plus file details.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
                 "recording_id": {
                     "type": "string",
-                    "description": "The recording ID returned by spaces",
+                    "description": "Check status of a previous download, or stop it when combined with stop=true.",
+                },
+                "stop": {
+                    "type": "boolean",
+                    "description": "Stop a live recording. Requires recording_id. Default: false",
                 },
             },
-            "required": ["recording_id"],
-        },
-    },
-    {
-        "name": "spaces_stop",
-        "description": "Stop a live Twitter Space recording. Kills the download process and saves whatever has been captured so far.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "recording_id": {
-                    "type": "string",
-                    "description": "The recording ID returned by spaces",
-                },
-            },
-            "required": ["recording_id"],
+            "required": [],
         },
     },
 ]
@@ -1113,10 +1091,6 @@ def handle_tools_call(id: Any, params: dict) -> None:
             result = handle_visual(arguments)
         elif tool_name == "spaces":
             result = handle_spaces(arguments)
-        elif tool_name == "spaces_check":
-            result = handle_spaces_check(arguments)
-        elif tool_name == "spaces_stop":
-            result = handle_spaces_stop(arguments)
         else:
             send_error(id, -32602, f"Unknown tool: {tool_name}")
             return
@@ -3934,7 +3908,22 @@ _SPACES_SETUP_INSTRUCTIONS = (
 
 
 def handle_spaces(arguments: dict) -> dict:
-    """Handle spaces tool call. Auto-detects live vs ended, starts in background."""
+    """Handle spaces tool call. Routes to download, check, or stop based on params."""
+    recording_id = arguments.get("recording_id")
+    stop = arguments.get("stop", False)
+
+    if recording_id and stop:
+        return _spaces_stop(arguments)
+    elif recording_id:
+        return _spaces_check(arguments)
+    elif arguments.get("url"):
+        return _spaces_download(arguments)
+    else:
+        raise ValueError("Provide either url (to start download) or recording_id (to check/stop)")
+
+
+def _spaces_download(arguments: dict) -> dict:
+    """Start a Twitter Space download. Auto-detects live vs ended."""
     import glob as glob_module
 
     url = arguments.get("url")
@@ -4029,8 +4018,8 @@ def handle_spaces(arguments: dict) -> dict:
     }
 
 
-def handle_spaces_check(arguments: dict) -> dict:
-    """Handle spaces_check tool call. Check download/recording status."""
+def _spaces_check(arguments: dict) -> dict:
+    """Check download/recording status."""
     import glob as glob_module
 
     recording_id = arguments.get("recording_id")
@@ -4093,8 +4082,8 @@ def handle_spaces_check(arguments: dict) -> dict:
     }
 
 
-def handle_spaces_stop(arguments: dict) -> dict:
-    """Handle spaces_stop tool call. Kill a live recording."""
+def _spaces_stop(arguments: dict) -> dict:
+    """Stop a live recording."""
     import glob as glob_module
 
     recording_id = arguments.get("recording_id")
