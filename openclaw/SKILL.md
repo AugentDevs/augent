@@ -21,40 +21,11 @@ Augent is an MCP server that gives your agent 22 tools for audio and video intel
 }
 ```
 
-If `augent-mcp` is not in PATH, use the full Python module path:
-
-```json
-{
-  "mcpServers": {
-    "augent": {
-      "command": "python3",
-      "args": ["-m", "augent.mcp"]
-    }
-  }
-}
-```
+If `augent-mcp` is not in PATH, use `python3 -m augent.mcp` as the command instead.
 
 ## Install
 
-**Via uv (recommended):**
-
-```bash
-uv tool install augent
-```
-
-For all features (semantic search, speaker diarization, TTS, source separation):
-
-```bash
-uv tool install "augent[all]"
-```
-
-**Via pip:**
-
-```bash
-pip install "augent[all]"
-```
-
-**System dependencies:** FFmpeg is required. Install with `brew install ffmpeg` (macOS) or `apt install ffmpeg` (Linux). For fast audio downloads, also install yt-dlp and aria2.
+Install via the ClawHub install button above, or use `uv tool install augent` for the base package or `uv tool install "augent[all]"` for all features. FFmpeg is required for audio processing.
 
 ## Tools
 
