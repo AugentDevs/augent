@@ -180,6 +180,9 @@ Restart Claude Code. Run `/mcp` to verify connection.
 | [`list_memories`](https://docs.augent.app/tools/list-memories) | List stored transcriptions by title |
 | [`memory_stats`](https://docs.augent.app/tools/memory-stats) | View transcription memory statistics |
 | [`clear_memory`](https://docs.augent.app/tools/clear-memory) | Clear stored transcriptions |
+| `augent_spaces` | Download or live-record X/Twitter Spaces audio (auto-detects live vs ended) |
+| `augent_spaces_check` | Check download/recording status |
+| `augent_spaces_stop` | Stop a live recording |
 
 **[Full tool reference →](https://docs.augent.app/tools/download-audio)**
 
@@ -250,6 +253,26 @@ graph TB
 ```
 
 **[Read more →](https://docs.augent.app/agents/eyes-and-ears)**
+
+<br />
+
+## X/Twitter Spaces
+
+Download or live-record Twitter/X Spaces audio. Auto-detects whether a Space is live or ended and handles both. Live Spaces record from the current moment using ffmpeg, ended Spaces download the full recording via yt-dlp. All downloads run in the background so your agent keeps working.
+
+### One-time setup
+
+X/Twitter requires authentication to access Space audio. Any account works, including a burner.
+
+1. Log into [x.com](https://x.com) in any browser
+2. Open DevTools (F12 or Cmd+Option+I) > **Application** > **Cookies** > `https://x.com`
+3. Copy the `auth_token` and `ct0` values
+4. Create `~/.augent/auth.json`:
+```json
+{"auth_token": "PASTE_HERE", "ct0": "PASTE_HERE"}
+```
+
+Tokens are stored locally and only sent to Twitter's servers to fetch audio. Augent never posts, DMs, follows, or modifies anything on your account. To revoke access, log out of Twitter or delete `~/.augent/auth.json`.
 
 <br />
 

@@ -324,6 +324,32 @@ num_speakers: null (optional, auto-detect if omitted)
 ```
 Returns `{speakers: [...], segments: [{speaker, start, end, text, timestamp}], duration, language}`
 
+### augent_spaces
+Download or live-record a Twitter/X Space. Auto-detects live vs ended. Starts in the background and returns instantly with a `recording_id`. Requires one-time setup of `~/.augent/auth.json` with Twitter `auth_token` and `ct0` cookies.
+```
+url: "https://x.com/i/spaces/1yNxaNvaMYQKj"
+output_dir: "~/Downloads" (optional, default)
+```
+Returns `{success, recording_id, mode, title, url, output_dir, pid, message}`
+
+**Workflow:** `augent_spaces` starts the download, then use `augent_spaces_check` to poll status. When complete, pipe the audio through `transcribe_audio`, `search_audio`, `deep_search`, etc.
+
+### augent_spaces_check
+Check the status of a Twitter Space download.
+```
+recording_id: "abc12345"
+```
+Returns `{recording_id, status, elapsed_seconds, elapsed_formatted, file: {path, filename, size_mb}, message}`
+
+Status values: `downloading`, `complete`, `error`.
+
+### augent_spaces_stop
+Stop a live Twitter Space recording. Kills the download process and saves whatever has been captured so far.
+```
+recording_id: "abc12345"
+```
+Returns `{success, recording_id, status, elapsed_seconds, elapsed_formatted, file, message}`
+
 ### list_files
 List media files in a directory.
 ```

@@ -26,6 +26,9 @@ Tools exposed:
 - tag: Add, remove, or list tags on transcriptions
 - rebuild_graph: Rebuild Obsidian graph view data for all transcriptions
 - visual: Extract visual context from video at moments that matter
+- augent_spaces: Download or live-record X/Twitter Spaces audio
+- augent_spaces_check: Check download/recording status
+- augent_spaces_stop: Stop a live recording
 
 Usage:
   python -m augent.mcp
@@ -45,9 +48,12 @@ Add to Claude Code project (.mcp.json):
 
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
+import time
+import uuid
 from typing import Any
 
 # Check for required dependencies before importing
@@ -984,7 +990,55 @@ _ALL_TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "augent_spaces",
+        "description": "Download a Twitter/X Space audio. Starts in the background and returns instantly with a recording_id. Use augent_spaces_check to check progress, augent_spaces_stop to cancel.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Twitter/X Space URL (e.g., https://x.com/i/spaces/1yNxaNvaMYQKj)",
+                },
+                "output_dir": {
+                    "type": "string",
+                    "description": "Directory to save the audio file. Default: ~/Downloads",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "augent_spaces_check",
+        "description": "Check the status of a Twitter Space download started by augent_spaces. Returns whether it's still downloading, complete, or errored, plus file details.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "recording_id": {
+                    "type": "string",
+                    "description": "The recording ID returned by augent_spaces",
+                },
+            },
+            "required": ["recording_id"],
+        },
+    },
+    {
+        "name": "augent_spaces_stop",
+        "description": "Stop a live Twitter Space recording. Kills the download process and saves whatever has been captured so far.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "recording_id": {
+                    "type": "string",
+                    "description": "The recording ID returned by augent_spaces",
+                },
+            },
+            "required": ["recording_id"],
+        },
+    },
 ]
+
+_active_recordings: dict = {}
 
 
 def handle_tools_list(id: Any) -> None:
@@ -1057,6 +1111,12 @@ def handle_tools_call(id: Any, params: dict) -> None:
             result = handle_rebuild_graph(arguments)
         elif tool_name == "visual":
             result = handle_visual(arguments)
+        elif tool_name == "augent_spaces":
+            result = handle_augent_spaces(arguments)
+        elif tool_name == "augent_spaces_check":
+            result = handle_augent_spaces_check(arguments)
+        elif tool_name == "augent_spaces_stop":
+            result = handle_augent_spaces_stop(arguments)
         else:
             send_error(id, -32602, f"Unknown tool: {tool_name}")
             return
@@ -3816,6 +3876,276 @@ def handle_clip_export(arguments: dict) -> dict:
         "duration": duration,
         "duration_formatted": f"{int(duration // 60)}:{int(duration % 60):02d}",
         "file_size_mb": round(file_size / (1024 * 1024), 2),
+    }
+
+
+def _normalize_twitter_space_url(url: str) -> str:
+    """Normalize Twitter/X Space URLs for compatibility."""
+    url = url.replace("https://x.com/", "https://twitter.com/")
+    if url.endswith("/peek"):
+        url = url[:-5]
+    return url
+
+
+def _get_twitter_cookies_path() -> str:
+    """Get path to Twitter cookies file, generating it from auth.json if needed."""
+    augent_dir = os.path.expanduser("~/.augent")
+    auth_path = os.path.join(augent_dir, "auth.json")
+    cookies_path = os.path.join(augent_dir, "twitter_cookies.txt")
+
+    if os.path.exists(auth_path):
+        auth_mtime = os.path.getmtime(auth_path)
+        cookies_mtime = os.path.getmtime(cookies_path) if os.path.exists(cookies_path) else 0
+
+        if auth_mtime > cookies_mtime:
+            with open(auth_path) as f:
+                auth = json.load(f)
+            auth_token = auth.get("auth_token", "")
+            ct0 = auth.get("ct0", "")
+            lines = [
+                "# Netscape HTTP Cookie File",
+                f".twitter.com\tTRUE\t/\tTRUE\t0\tauth_token\t{auth_token}",
+                f".twitter.com\tTRUE\t/\tTRUE\t0\tct0\t{ct0}",
+            ]
+            os.makedirs(augent_dir, exist_ok=True)
+            with open(cookies_path, "w") as f:
+                f.write("\n".join(lines) + "\n")
+
+    if os.path.exists(cookies_path) and os.path.getsize(cookies_path) > 0:
+        return cookies_path
+
+    return None
+
+
+_SPACES_SETUP_INSTRUCTIONS = (
+    "Twitter requires a one-time setup to download Spaces.\n\n"
+    "Steps (30 seconds):\n"
+    "1. Open Chrome > go to twitter.com (make sure you're logged in)\n"
+    "2. Press F12 (or Cmd+Option+I) to open DevTools\n"
+    "3. Click Application tab > Cookies > https://twitter.com\n"
+    "4. Find auth_token — copy its Value\n"
+    "5. Find ct0 — copy its Value\n"
+    "6. Create the file ~/.augent/auth.json with:\n"
+    '   {"auth_token": "PASTE_HERE", "ct0": "PASTE_HERE"}\n\n'
+    "Your tokens are stored locally and only sent to Twitter's own servers to fetch audio. "
+    "Augent never posts, DMs, follows, or modifies anything on your account. "
+    "To revoke access anytime, simply log out of Twitter or delete ~/.augent/auth.json."
+)
+
+
+def handle_augent_spaces(arguments: dict) -> dict:
+    """Handle augent_spaces tool call. Auto-detects live vs ended, starts in background."""
+    import glob as glob_module
+
+    url = arguments.get("url")
+    output_dir = arguments.get("output_dir", os.path.expanduser("~/Downloads"))
+
+    if not url:
+        raise ValueError("Missing required parameter: url")
+
+    cookies_path = _get_twitter_cookies_path()
+    if not cookies_path:
+        raise FileNotFoundError(_SPACES_SETUP_INSTRUCTIONS)
+
+    os.makedirs(output_dir, exist_ok=True)
+    url = _normalize_twitter_space_url(url)
+
+    meta_cmd = [
+        "yt-dlp",
+        "--cookies", cookies_path,
+        "--add-header", "Referer:https://twitter.com/",
+        "--no-playlist", "--dump-json",
+        url,
+    ]
+    meta_result = subprocess.run(meta_cmd, capture_output=True, text=True, timeout=30)
+
+    if meta_result.returncode != 0:
+        error = meta_result.stderr.strip()
+        raise RuntimeError(f"Failed to fetch space info: {error[:300]}")
+
+    meta = json.loads(meta_result.stdout)
+    title = meta.get("title", "twitter_space")
+    is_live = meta.get("is_live", False)
+
+    before = set(glob_module.glob(os.path.join(output_dir, "*")))
+
+    if is_live:
+        stream_cmd = [
+            "yt-dlp",
+            "--cookies", cookies_path,
+            "--add-header", "Referer:https://twitter.com/",
+            "--no-playlist", "-g", "-f", "bestaudio",
+            url,
+        ]
+        stream_result = subprocess.run(stream_cmd, capture_output=True, text=True, timeout=15)
+        if stream_result.returncode != 0:
+            raise RuntimeError("Failed to get stream URL")
+
+        m3u8_url = stream_result.stdout.strip()
+        safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title)
+        output_file = os.path.join(output_dir, f"{safe_title}.m4a")
+
+        process = subprocess.Popen(
+            ["ffmpeg", "-y", "-i", m3u8_url, "-c", "copy", output_file],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    else:
+        output_file = None
+        process = subprocess.Popen(
+            [
+                "yt-dlp", "-f", "bestaudio",
+                "--cookies", cookies_path,
+                "--add-header", "Referer:https://twitter.com/",
+                "--no-playlist",
+                "-o", f"{output_dir}/%(title)s.%(ext)s",
+                url,
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+
+    recording_id = uuid.uuid4().hex[:8]
+    _active_recordings[recording_id] = {
+        "process": process,
+        "pid": process.pid,
+        "url": url,
+        "output_dir": output_dir,
+        "start_time": time.time(),
+        "before_files": before,
+        "is_live": is_live,
+        "title": title,
+        "output_file": output_file if is_live else None,
+    }
+
+    mode_str = "Live recording from current moment" if is_live else "Downloading full recording"
+    return {
+        "success": True,
+        "recording_id": recording_id,
+        "mode": "live" if is_live else "recording",
+        "title": title,
+        "url": url,
+        "output_dir": output_dir,
+        "pid": process.pid,
+        "message": f"{mode_str} (ID: {recording_id}). Use augent_spaces_check to check progress, augent_spaces_stop to stop.",
+    }
+
+
+def handle_augent_spaces_check(arguments: dict) -> dict:
+    """Handle augent_spaces_check tool call. Check download/recording status."""
+    import glob as glob_module
+
+    recording_id = arguments.get("recording_id")
+    if not recording_id:
+        raise ValueError("Missing required parameter: recording_id")
+
+    if recording_id not in _active_recordings:
+        raise ValueError(f"No active download found with ID: {recording_id}")
+
+    rec = _active_recordings[recording_id]
+    process = rec["process"]
+    output_dir = rec["output_dir"]
+    before = rec["before_files"]
+    elapsed = time.time() - rec["start_time"]
+
+    poll = process.poll()
+
+    output_file = rec.get("output_file")
+    if not output_file:
+        after = set(glob_module.glob(os.path.join(output_dir, "*")))
+        new_files = after - before
+        output_file = max(new_files, key=os.path.getmtime) if new_files else None
+
+    file_info = {}
+    if output_file and os.path.exists(output_file):
+        file_info = {
+            "path": output_file,
+            "filename": os.path.basename(output_file),
+            "size_mb": round(os.path.getsize(output_file) / (1024 * 1024), 2),
+        }
+
+    if poll is None:
+        return {
+            "recording_id": recording_id,
+            "status": "downloading",
+            "elapsed_seconds": round(elapsed),
+            "elapsed_formatted": f"{int(elapsed // 60)}m {int(elapsed % 60)}s",
+            "file": file_info,
+            "message": f"Still downloading ({int(elapsed // 60)}m {int(elapsed % 60)}s elapsed)",
+        }
+
+    if poll == 0:
+        del _active_recordings[recording_id]
+        return {
+            "recording_id": recording_id,
+            "status": "complete",
+            "elapsed_seconds": round(elapsed),
+            "elapsed_formatted": f"{int(elapsed // 60)}m {int(elapsed % 60)}s",
+            "file": file_info,
+            "message": f"Download complete. Saved to {output_file}" if output_file else "Download complete",
+        }
+
+    stderr = process.stderr.read().decode() if process.stderr else ""
+    del _active_recordings[recording_id]
+    return {
+        "recording_id": recording_id,
+        "status": "error",
+        "error": stderr.strip()[:500] or "Download failed",
+        "message": "Download failed",
+    }
+
+
+def handle_augent_spaces_stop(arguments: dict) -> dict:
+    """Handle augent_spaces_stop tool call. Kill a live recording."""
+    import glob as glob_module
+
+    recording_id = arguments.get("recording_id")
+    if not recording_id:
+        raise ValueError("Missing required parameter: recording_id")
+
+    if recording_id not in _active_recordings:
+        raise ValueError(f"No active download found with ID: {recording_id}")
+
+    rec = _active_recordings[recording_id]
+    process = rec["process"]
+    output_dir = rec["output_dir"]
+    before = rec["before_files"]
+
+    if process.poll() is None:
+        process.send_signal(signal.SIGINT)
+        try:
+            process.wait(timeout=30)
+        except Exception:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except Exception:
+                process.kill()
+
+    elapsed = time.time() - rec["start_time"]
+
+    output_file = rec.get("output_file")
+    if not output_file:
+        after = set(glob_module.glob(os.path.join(output_dir, "*")))
+        new_files = after - before
+        output_file = max(new_files, key=os.path.getmtime) if new_files else None
+
+    file_info = {}
+    if output_file and os.path.exists(output_file):
+        file_info = {
+            "path": output_file,
+            "filename": os.path.basename(output_file),
+            "size_mb": round(os.path.getsize(output_file) / (1024 * 1024), 2),
+        }
+
+    del _active_recordings[recording_id]
+
+    return {
+        "success": True,
+        "recording_id": recording_id,
+        "status": "stopped",
+        "elapsed_seconds": round(elapsed),
+        "elapsed_formatted": f"{int(elapsed // 60)}m {int(elapsed % 60)}s",
+        "file": file_info,
+        "message": f"Stopped after {int(elapsed // 60)}m {int(elapsed % 60)}s. Saved to {output_file}" if output_file else "Stopped",
     }
 
 
