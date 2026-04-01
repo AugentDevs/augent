@@ -4,6 +4,24 @@ All notable changes to Augent are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2026.4.1] - 2026-04-01
+
+### Added
+
+- **`spaces` MCP tool:** download or live-record X/Twitter Spaces audio. One tool with three modes: pass `url` to start a download, `recording_id` to check status, `recording_id` + `stop` to kill a live recording. Background non-blocking downloads with process tracking.
+
+### Fixed
+
+- **Tag handler string bug:** passing a single string instead of a list caused per-character tags (e.g., "AI" became tags "A" and "I").
+- **YouTube ID in note filenames:** strip video IDs from filenames for cleaner notes.
+- **Redundant metadata in notes:** removed duplicate metadata block from all note styles, frontmatter handles it.
+- **CodeQL security alert:** replaced substring URL check with `startswith` origin validation in tests.
+
+### Changed
+
+- **yt-dlp minimum version:** bumped to `>=2026.3.0`, older versions fail on YouTube.
+- **Visual tool made explicit-only:** `visual_hint` and `take_notes` visual param no longer trigger automatic visual calls.
+
 ## [2026.3.29] - 2026-03-29
 
 ### Added
