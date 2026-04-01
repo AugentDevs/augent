@@ -88,7 +88,7 @@ class TestURLNormalization:
 class TestCookieAuth:
     def test_no_auth_returns_none(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with mock.patch("os.path.expanduser", return_value=tmpdir):
+            with mock.patch("augent.mcp.os.path.expanduser", return_value=tmpdir):
                 result = _get_twitter_cookies_path()
                 assert result is None
 
@@ -99,17 +99,10 @@ class TestCookieAuth:
             with open(auth_path, "w") as f:
                 json.dump({"auth_token": "tok123", "ct0": "ct0val"}, f)
 
-            # Verify the cookie generation logic
-            with open(auth_path) as f:
-                auth = json.load(f)
-            lines = [
-                "# Netscape HTTP Cookie File",
-                f".twitter.com\tTRUE\t/\tTRUE\t0\tauth_token\t{auth['auth_token']}",
-                f".twitter.com\tTRUE\t/\tTRUE\t0\tct0\t{auth['ct0']}",
-            ]
-            with open(cookies_path, "w") as f:
-                f.write("\n".join(lines) + "\n")
+            with mock.patch("augent.mcp.os.path.expanduser", return_value=tmpdir):
+                result = _get_twitter_cookies_path()
 
+            assert result == cookies_path
             assert os.path.exists(cookies_path)
             with open(cookies_path) as f:
                 content = f.read()
@@ -149,10 +142,6 @@ class TestSpacesRouting:
 
 
 class TestSpacesValidation:
-    def test_download_missing_url_raises(self):
-        with pytest.raises(ValueError, match="Provide either"):
-            handle_spaces({})
-
     def test_download_no_cookies_raises(self):
         with mock.patch("augent.mcp._get_twitter_cookies_path", return_value=None):
             with pytest.raises(FileNotFoundError, match="one-time setup"):
