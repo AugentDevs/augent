@@ -263,6 +263,8 @@ Returns `{success, migration: {migrated, synced, recreated, errors}, related_lin
 **When to use:** Run once after upgrading to add Obsidian graph view support to existing memory. Also useful after bulk imports or manual tag changes. The user should point Obsidian at the `memory_dir` path as a vault.
 
 ### visual
+**IMPORTANT:** Only call this tool when the user explicitly asks for visual context, screenshots, or frames. Do NOT call it automatically alongside take_notes or other tools. "Take notes" or "eye-candy guide" does NOT mean "extract visuals."
+
 Extract visual context from a video at moments that matter. Four modes:
 
 **Query mode (default, recommended):** Describe what you need visual context for. The tool searches the transcript semantically and extracts frames at matching moments.
