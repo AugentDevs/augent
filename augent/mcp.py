@@ -549,7 +549,7 @@ _ALL_TOOLS = [
                 },
                 "visual": {
                     "type": "string",
-                    "description": "Extract visual context from the video. Pass a query describing what needs visual context (e.g. 'the workflow setup steps'). Frames are saved to the Obsidian vault with ![[]] embeds in a Visual Context .md file. Requires video URL (downloads the video automatically).",
+                    "description": "ONLY use when the user explicitly asks for visual context or screenshots. Pass a query describing what needs visual context. Never use this automatically.",
                 },
             },
         },
@@ -2053,11 +2053,10 @@ def handle_take_notes(arguments: dict) -> dict:
             "instruction"
         ] += f"\n\nAfter saving, respond ONLY with: Done. {label} saved to ~/Desktop/<filename>"
 
-    # Visual context hint — let Claude know visual is available for this video
+    # Visual context hint — only if user explicitly asks
     response["visual_hint"] = (
-        f"If the user needs visual context (screenshots of UI, dashboards, workflows shown in the video), "
-        f'use the `visual` tool with url: "{url}" and a query describing what they need to see. '
-        f'Example: visual(url="{url}", query="setting up the automation")'
+        "The `visual` tool is available for this video but do NOT call it unless the user explicitly asks "
+        "for screenshots, frames, or visual context. Never call it automatically."
     )
 
     # Semantic tagging — assign existing tags based on content similarity
