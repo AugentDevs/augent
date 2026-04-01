@@ -1,0 +1,99 @@
+{
+  "name": "augent",
+  "version": "1.2.0",
+  "description": "The audio & video layer for agents. 22 local MCP tools. No cloud, no API keys.",
+  "author": "AugentDevs",
+  "homepage": "https://augent.app",
+  "repository": "https://github.com/AugentDevs/augent",
+  "commands": [
+    {
+      "name": "download_audio",
+      "description": "Download audio from video URLs (1000+ sites)"
+    },
+    {
+      "name": "transcribe_audio",
+      "description": "Transcribe audio with timestamps in 99 languages"
+    },
+    {
+      "name": "search_audio",
+      "description": "Keyword search with timestamps and context"
+    },
+    {
+      "name": "deep_search",
+      "description": "Semantic search by meaning"
+    },
+    {
+      "name": "search_memory",
+      "description": "Search across all stored transcriptions"
+    },
+    {
+      "name": "take_notes",
+      "description": "Download, transcribe, and save formatted notes"
+    },
+    {
+      "name": "clip_export",
+      "description": "Export a video clip for a time range"
+    },
+    {
+      "name": "chapters",
+      "description": "Auto-detect topic chapters with timestamps"
+    },
+    {
+      "name": "search_proximity",
+      "description": "Find where two keywords appear near each other"
+    },
+    {
+      "name": "identify_speakers",
+      "description": "Speaker diarization — who said what and when"
+    },
+    {
+      "name": "separate_audio",
+      "description": "Isolate vocals from music and noise"
+    },
+    {
+      "name": "batch_search",
+      "description": "Search multiple audio files in parallel"
+    },
+    {
+      "name": "text_to_speech",
+      "description": "Convert text to speech with 54 local voices"
+    },
+    {
+      "name": "list_files",
+      "description": "List media files in a directory"
+    },
+    {
+      "name": "list_memories",
+      "description": "Browse all stored transcriptions"
+    },
+    {
+      "name": "memory_stats",
+      "description": "View transcription memory statistics"
+    },
+    {
+      "name": "clear_memory",
+      "description": "Clear stored transcriptions"
+    },
+    {
+      "name": "tag",
+      "description": "Add, remove, or list tags on transcriptions"
+    },
+    {
+      "name": "highlights",
+      "description": "Export best moments or topic-matched clips"
+    },
+    {
+      "name": "visual",
+      "description": "Extract frames from video at key moments"
+    },
+    {
+      "name": "rebuild_graph",
+      "description": "Rebuild Obsidian knowledge graph"
+    },
+    {
+      "name": "spaces",
+      "description": "Download or live-record X/Twitter Spaces"
+    }
+  ],
+  "config": {}
+}
