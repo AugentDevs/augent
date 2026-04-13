@@ -71,7 +71,7 @@ tts = [
     "soundfile",
 ]
 separator = [
-    "demucs>=4.0.0",
+    "demucs>=4.0.1",
 ]
 xlsx = [
     "openpyxl>=3.1.0",
@@ -87,7 +87,7 @@ all = [
     "kokoro>=0.7.0",
     "soundfile",
     "openpyxl>=3.1.0",
-    "demucs>=4.0.0",
+    "demucs>=4.0.1",
 ]
 dev = [
     "pytest>=7.0.0",
