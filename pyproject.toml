@@ -44,7 +44,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "faster-whisper>=1.0.0",
+    "faster-whisper>=1.2.1",
     "torch>=2.0.0",
     "pyfiglet",
     "yt-dlp>=2026.3.0",
