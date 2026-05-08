@@ -58,7 +58,7 @@ web = [
     "huggingface-hub>=0.20.0,<1.9.0",
 ]
 clips = [
-    "pydub>=0.25.0",
+    "pydub>=0.25.1",
 ]
 speakers = [
     "pyannote-audio>=3.1.0",
@@ -81,7 +81,7 @@ all = [
     "uvicorn>=0.20.0",
     "python-multipart>=0.0.6",
     "huggingface-hub>=0.20.0,<1.9.0",
-    "pydub>=0.25.0",
+    "pydub>=0.25.1",
     "pyannote-audio>=3.1.0",
     "sentence-transformers>=2.2.0",
     "kokoro>=0.7.0",
