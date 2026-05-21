@@ -61,7 +61,7 @@ clips = [
     "pydub>=0.25.0",
 ]
 speakers = [
-    "pyannote-audio>=3.1.0",
+    "pyannote-audio>=4.0.4",
 ]
 semantic = [
     "sentence-transformers>=2.2.0",
@@ -82,7 +82,7 @@ all = [
     "python-multipart>=0.0.6",
     "huggingface-hub>=0.20.0,<1.9.0",
     "pydub>=0.25.0",
-    "pyannote-audio>=3.1.0",
+    "pyannote-audio>=4.0.4",
     "sentence-transformers>=2.2.0",
     "kokoro>=0.7.0",
     "soundfile",
